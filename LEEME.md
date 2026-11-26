@@ -32,3 +32,8 @@ al UID autorizado `bl2RfPTMp5h7opLSoPQh5MgdpM72` compartirlos con rol `manager`.
 ## Datos
 Se guardan en el navegador y se sincronizan con Firebase al iniciar sesión. Respalda
 con los botones CSV del Historial.
+
+En Reportes puedes consultar las unidades y ventas de hoy, los últimos 7 días o 30
+días, además del valor estimado del inventario actual a costo y a precio de venta.
+El costo se calcula con el costo registrado por producto y las existencias actuales;
+no representa un historial de los pagos reales de cada compra.
