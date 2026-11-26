@@ -64,7 +64,21 @@ main{padding:14px}
 .modal{display:none;position:fixed;inset:0;background:#000c;z-index:40;padding:16px;overflow:auto;align-items:center;justify-content:center}.modal.on{display:flex}.modal .card{width:100%;max-width:420px;margin:0}
 .auth-gate{display:none;position:fixed;inset:0;background:#0e0e10;z-index:200;align-items:center;justify-content:center;padding:20px}.auth-gate.on{display:flex}.auth-gate .card{width:100%;max-width:420px;text-align:center}.auth-gate button{width:100%;margin-top:12px}
 .label-grid{display:grid;grid-template-columns:repeat(3,40mm);gap:2mm;justify-content:center;margin:12px auto}.barcode-label{width:40mm;height:20mm;box-sizing:border-box;border:.2mm solid #aaa;padding:.6mm;display:flex;flex-direction:column;align-items:center;justify-content:space-between;overflow:hidden;background:#fff;color:#000;font-family:Arial,sans-serif}.label-head,.label-foot{width:100%;height:3mm;display:flex;align-items:center;justify-content:space-between;gap:1mm;white-space:nowrap;overflow:hidden;font-size:6pt;line-height:1}.label-name{overflow:hidden;text-overflow:ellipsis}.label-price{font-size:7pt;font-weight:bold}.label-barcode{display:block;width:35mm;height:10mm;max-width:100%}.label-code{font-size:5pt}
-@media print{@page{size:A4 portrait;margin:8mm}body{padding:0!important;background:#fff!important;color:#000!important}body>:not(#mod){display:none!important}#mod{display:block!important;position:static!important;inset:auto!important;padding:0!important;overflow:visible!important;background:transparent!important}#modc{display:block!important;width:auto!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;color:#000!important}#printLabelsPanel .no-print{display:none!important}#printLabelsPanel .label-grid{grid-template-columns:repeat(3,40mm)!important;gap:2mm!important;margin:0 auto!important;justify-content:center!important}.barcode-label{break-inside:avoid;page-break-inside:avoid}}
+#mod.labels-modal{align-items:stretch;justify-content:center;padding:0;background:#111}
+#mod.labels-modal #modc{width:100%;max-width:none;height:100%;max-height:100dvh;margin:0;padding:0;border:0;border-radius:0;overflow:hidden;display:flex;flex-direction:column}
+#mod.labels-modal #printLabelsPanel{height:100%;min-height:0;display:flex;flex-direction:column}
+#mod.labels-modal #printLabelsPanel .no-print{position:sticky;top:0;z-index:1;flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;background:var(--card);border-bottom:1px solid var(--bd)}
+#mod.labels-modal #printLabelsPanel .no-print h2{margin:0 0 6px}
+#mod.labels-modal #printLabelsPanel .no-print p{margin:4px 0;font-size:12px}
+#mod.labels-modal #printLabelsPanel .no-print .r2{gap:6px;margin-top:8px}
+#mod.labels-modal #printLabelsPanel .no-print button{padding:10px 6px;font-size:14px}
+#mod.labels-modal .label-grid{grid-template-columns:repeat(auto-fit,60mm);gap:3mm;justify-content:center;align-content:start;flex:1;min-height:0;overflow:auto;margin:0;padding:12px}
+#mod.labels-modal .barcode-label{width:60mm;height:30mm;padding:.9mm}
+#mod.labels-modal .label-head,#mod.labels-modal .label-foot{height:4.5mm;font-size:9pt}
+#mod.labels-modal .label-price{font-size:10.5pt}
+#mod.labels-modal .label-barcode{width:52.5mm;height:15mm}
+#mod.labels-modal .label-code{font-size:7.5pt}
+@media print{@page{size:A4 portrait;margin:8mm}body{padding:0!important;background:#fff!important;color:#000!important}body>:not(#mod){display:none!important}#mod,#mod.labels-modal{display:block!important;position:static!important;inset:auto!important;padding:0!important;overflow:visible!important;background:transparent!important}#modc,#mod.labels-modal #modc{display:block!important;width:auto!important;height:auto!important;max-height:none!important;overflow:visible!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;color:#000!important}#printLabelsPanel{display:block!important;height:auto!important}#printLabelsPanel .no-print{display:none!important}#printLabelsPanel .label-grid,#mod.labels-modal .label-grid{display:grid!important;grid-template-columns:repeat(3,40mm)!important;gap:2mm!important;margin:0 auto!important;padding:0!important;overflow:visible!important;justify-content:center!important}.barcode-label,#mod.labels-modal .barcode-label{width:40mm!important;height:20mm!important;padding:.6mm!important;break-inside:avoid;page-break-inside:avoid}.label-head,#mod.labels-modal .label-head,.label-foot,#mod.labels-modal .label-foot{height:3mm!important;font-size:6pt!important}.label-price,#mod.labels-modal .label-price{font-size:7pt!important}.label-barcode,#mod.labels-modal .label-barcode{width:35mm!important;height:10mm!important}.label-code,#mod.labels-modal .label-code{font-size:5pt!important}}
 
 </style></head><body>
 <div id="authGate" class="auth-gate on"><div class="card"><div style="font-size:38px">🌹</div><h2>Seven Roses</h2><p id="authMessage" class="mu">Inicia sesión con la cuenta administradora para conectar Firestore.</p><button id="authBtn" onclick="signIn()">Continuar con Google</button></div></div>
@@ -193,8 +207,26 @@ products.forEach(p=>{const qty=Math.floor(Number(p.stock)||0),svg=document.creat
 JsBarcode(svg,p.code,{format:'EAN13',width:1.1,height:30,displayValue:false,margin:0});
 const barcode=new XMLSerializer().serializeToString(svg);
 for(let i=0;i<qty;i++){labels.push(`<article class="barcode-label"><div class="label-head"><span class="label-name">${esc(p.name)}</span><span class="label-price">${money(p.price)}</span></div>${barcode}<div class="label-foot"><span>${p.size?'Talla '+esc(p.size):'Talla única'}</span><span class="label-code">${esc(p.code)}</span></div></article>`);total++}});
-modc.innerHTML=`<div id="printLabelsPanel"><div class="no-print"><h2>Etiquetas de productos</h2><p class="mu">${total} etiqueta(s) · 4 × 2 cm · 3 columnas · una por unidad en existencia</p><p class="mu">La impresión usa el inventario actual. Si cambia el stock, cierra y vuelve a generar las etiquetas. Un PDF guardado no se actualiza automáticamente.</p><div class="r2"><button class="g" onclick="closeMod()">Cerrar</button><button onclick="window.print()">Imprimir / Guardar PDF</button></div></div><div class="label-grid">${labels.join('')}</div></div>`;
-mod.classList.add('on')}catch(e){console.error('No se pudieron generar las etiquetas',e);toast('No se pudieron generar las etiquetas: '+(e.message||'revisa los códigos de barras'))}}
+modc.innerHTML=`<div id="printLabelsPanel"><div class="no-print"><h2>Etiquetas de productos</h2><p class="mu">${total} etiqueta(s) · 4 × 2 cm · una por unidad · A4</p><p class="mu">Vista ampliada para el teléfono. Si cambia el stock, vuelve a generar las etiquetas.</p><div class="r2"><button class="g" onclick="closeMod()">Cerrar</button><button class="g" onclick="window.print()">Imprimir</button><button onclick="saveLabelsPDF()">Guardar PDF</button></div><small>En iPhone, elige “Guardar en Archivos” en las opciones para compartir.</small></div><div class="label-grid">${labels.join('')}</div></div>`;
+mod.classList.add('labels-modal','on')}catch(e){console.error('No se pudieron generar las etiquetas',e);toast('No se pudieron generar las etiquetas: '+(e.message||'revisa los códigos de barras'))}}
+function saveLabelsPDF(){const products=db.products.filter(p=>Math.floor(Number(p.stock)||0)>0);if(!products.length)return toast('No hay existencias para imprimir etiquetas');
+if(!window.jspdf||!window.jspdf.jsPDF)return toast('No se pudo cargar el generador de PDF. Intenta de nuevo con conexión a internet');
+try{const d=new jspdf.jsPDF({unit:'mm',format:'a4'}),pageWidth=d.internal.pageSize.getWidth(),pageHeight=d.internal.pageSize.getHeight(),labelWidth=40,labelHeight=20,gapX=2,gapY=2,margin=8,cols=3,maxRows=Math.floor((pageHeight-2*margin+gapY)/(labelHeight+gapY)),gridWidth=cols*labelWidth+(cols-1)*gapX,startX=(pageWidth-gridWidth)/2;
+let col=0,row=0;
+products.forEach(p=>{const qty=Math.floor(Number(p.stock)||0),canvas=document.createElement('canvas');
+JsBarcode(canvas,p.code,{format:'EAN13',width:2.4,height:50,displayValue:false,margin:0});
+const barcode=canvas.toDataURL('image/png');
+for(let i=0;i<qty;i++){if(row>=maxRows){d.addPage();row=0}
+const x=startX+col*(labelWidth+gapX),y=margin+row*(labelHeight+gapY);
+d.setDrawColor(170);d.setLineWidth(.2);d.rect(x,y,labelWidth,labelHeight);
+d.setFont('helvetica','normal');d.setFontSize(6);d.text(p.name,x+1,y+3,{maxWidth:25});
+d.setFont('helvetica','bold');d.setFontSize(7);d.text(money(p.price),x+39,y+3,{align:'right'});
+d.addImage(barcode,'PNG',x+2.5,y+4.5,35,10);
+d.setFont('helvetica','normal');d.setFontSize(5);d.text(p.size?'Talla '+p.size:'Talla única',x+1,y+18.5,{maxWidth:16});
+d.text(String(p.code),x+39,y+18.5,{align:'right'});
+col++;if(col===cols){col=0;row++}}});
+const name='Etiquetas-productos-'+new Date().toISOString().slice(0,10)+'.pdf';
+out(d.output('blob'),name,'application/pdf',true)}catch(e){console.error('No se pudo crear el PDF de etiquetas',e);toast('No se pudo crear el PDF: '+(e.message||'revisa los códigos de barras'))}}
 function delP(c){if(confirm('¿Borrar este producto?')){db.products=db.products.filter(x=>x.code!==c);save();rP()}}
 let pimgData='';
 function pickImg(inp){const f=inp.files[0];if(!f)return;const im=new Image();im.onload=()=>{const k=Math.min(1,240/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);pimgData=c.toDataURL('image/jpeg',.6);ppv.src=pimgData;ppv.style.display='block';URL.revokeObjectURL(im.src)};im.src=URL.createObjectURL(f);inp.value=''}
@@ -254,7 +286,7 @@ ${pm==='Efectivo'?`<label class="mu">Efectivo recibido (Q)</label><input id="rec
 ${pm==='Crédito'?'<small>Queda como deuda del cliente (el nombre es obligatorio).</small>':''}
 <div class="r2" style="margin-top:12px"><button class="g" onclick="closeMod()">Cancelar</button><button onclick="confirmar()">✓ CONFIRMAR VENTA</button></div>`}
 function calcChg(){$('chg').innerHTML='<span>Cambio a devolver:</span><b>'+money(Math.max((+$('rec').value||0)-cur.total,0))+'</b>'}
-function closeMod(){mod.classList.remove('on')}
+function closeMod(){mod.classList.remove('on');mod.classList.remove('labels-modal')}
 function confirmar(){const t=+cur.total,nm=cur.name.trim()||'Consumidor Final';let recv=0,change=0;
 if(pm==='Efectivo'){recv=+$('rec').value||t;if(recv<t)return toast('El efectivo recibido es menor al total');change=recv-t}
 if(pm==='Crédito'&&!cur.name.trim())return toast('Escribe el nombre del cliente');
