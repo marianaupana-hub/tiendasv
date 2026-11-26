@@ -1,0 +1,1 @@
+{ "name": "seven-roses", "version": "1.0.0", "description": "Seven Roses: punto de venta, inventario y tickets", "main": "server.js", "scripts": { "start": "node server.js" }, "license": "MIT" }
