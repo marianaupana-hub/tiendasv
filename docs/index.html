@@ -8,6 +8,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <style>
 :root{--bg:#0e0e10;--card:#1a1a1d;--tx:#f4eef0;--mu:#9b9499;--ac:#e8a0b8;--bd:#2e2c30;--dg:#ff8a9b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:dark}
 *{box-sizing:border-box}
@@ -59,8 +62,10 @@ main{padding:14px}
 .chips{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px}.chip{flex:0 0 auto;background:var(--bd);color:var(--tx);padding:7px 14px;border-radius:16px;font-size:14px;font-weight:400}.chip.on{background:var(--ac);color:#1a1a1d;font-weight:600}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.pt{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px;text-align:left;color:var(--tx);font-weight:400}
 .modal{display:none;position:fixed;inset:0;background:#000c;z-index:40;padding:16px;overflow:auto;align-items:center;justify-content:center}.modal.on{display:flex}.modal .card{width:100%;max-width:420px;margin:0}
+.auth-gate{display:none;position:fixed;inset:0;background:#0e0e10;z-index:200;align-items:center;justify-content:center;padding:20px}.auth-gate.on{display:flex}.auth-gate .card{width:100%;max-width:420px;text-align:center}.auth-gate button{width:100%;margin-top:12px}
 
 </style></head><body>
+<div id="authGate" class="auth-gate on"><div class="card"><div style="font-size:38px">🌹</div><h2>Seven Roses</h2><p id="authMessage" class="mu">Inicia sesión con la cuenta administradora para conectar Firestore.</p><button id="authBtn" onclick="signIn()">Continuar con Google</button></div></div>
 <div id="toast"></div>
 <div id="scan"><div id="reader"></div><p style="color:#fff;text-align:center;margin:0">Apunta al código de barras</p><button class="g" onclick="closeScan()">Cancelar</button></div>
 
@@ -127,7 +132,6 @@ main{padding:14px}
 const $=id=>document.getElementById(id);
 const K='fx1';let db={products:[],invoices:[],n:0,caja:{open:false}};
 try{const s=localStorage.getItem(K);if(s)db=JSON.parse(s)}catch(e){}
-const save=()=>{try{localStorage.setItem(K,JSON.stringify(db))}catch(e){}sync()};
 const full=p=>p.name+[p.size,p.color].filter(Boolean).map(x=>' · '+x).join('');
 const txt=p=>norm(full(p)+' '+(p.cat||'')+' '+(p.brand||''));
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -180,7 +184,7 @@ function addCl(){const n=un.value.trim();if(!n)return toast('Escribe el nombre')
 function delCl(i){db.clients.splice(i,1);save();rCl()}
 function pickCl(v){cur.name=v;const c=(db.clients||[]).find(x=>x.name===v);if(c){ct.value=c.phone||'';cur.phone=ct.value}}
 const brs=()=>db.branches&&db.branches.length?db.branches:['Principal'];
-function rUsr(){usr.innerHTML='👤 Administrador<br><small>Sucursal: '+esc(db.branch||'Principal')+'</small>'}
+function rUsr(){usr.innerHTML='👤 '+esc(authUser&&authUser.displayName||'Administrador')+'<br><small>Sucursal: '+esc(db.branch||'Principal')+'</small><button class="g" style="width:100%;margin-top:8px" onclick="signOut()">Cerrar sesión</button>'}
 function rBr(){bl.innerHTML=brs().map((b,i)=>`<div class="card row" style="border:0"><div class="grow"><b>${esc(b)}</b><small>${b===(db.branch||'Principal')?'● Sucursal activa':''}</small></div><button class="g" onclick="setBr(${i})">Activar</button><button class="d" onclick="delBr(${i})">Borrar</button></div>`).join('');rUsr()}
 function addBr(){const v=bn.value.trim();if(!v)return;db.branches=[...brs()];if(!db.branches.includes(v))db.branches.push(v);bn.value='';save();rBr()}
 function setBr(i){db.branch=brs()[i];save();rBr()}
@@ -270,22 +274,46 @@ const cv=v=>'"'+String(v).replace(/"/g,'""')+'"';
 function csvP(){out(new Blob(['\ufeff'+['Codigo,Producto,Categoria,Marca,Talla,Color,Precio,Costo,Cantidad',...db.products.map(p=>[p.code,cv(p.name),cv(p.cat||''),cv(p.brand||''),cv(p.size||''),cv(p.color||''),p.price,p.cost||0,p.stock].join(','))].join('\n')],{type:'text/csv'}),'productos.csv','text/csv',true)}
 function csvF(){out(new Blob(['\ufeff'+['Factura,Fecha,Cliente,Telefono,FormaPago,Total,Detalle',...db.invoices.map(r=>[r.n,cv(r.date),cv(r.name),cv(r.phone||''),cv(r.pay||'Efectivo'),r.total,cv(r.items.map(i=>i.qty+'x '+i.name).join('; '))].join(','))].join('\n')],{type:'text/csv'}),'facturas.csv','text/csv',true)}
 function setBrand(){const v=prompt('Nombre de tu tienda',db.store||'Seven Roses');if(v&&v.trim()){db.store=v.trim();save();$('brand').textContent='🌹 '+db.store}}
-let rdb=null,uid=null,sy={},sq=Promise.resolve();
+const firebaseConfig={apiKey:'AIzaSyArhik2SVlLuD7HoeZ_Oj2oeSPDuhDXs2w',authDomain:'tienda-3d54d.firebaseapp.com',projectId:'tienda-3d54d',storageBucket:'tienda-3d54d.firebasestorage.app',messagingSenderId:'785831038775',appId:'1:785831038775:web:0f8ce873266e72812fd4b2'};
+firebase.initializeApp(firebaseConfig);
+const fauth=firebase.auth(),fdb=firebase.firestore(),googleProvider=new firebase.auth.GoogleAuthProvider();
+googleProvider.setCustomParameters({prompt:'select_account'});
+const ADMIN_UID='CebhzopoNTX70krUuVqv7aELAew2',CLOUD_PREFIX='sevenroses_v1_';
+let rdb=null,uid=null,sy={},sq=Promise.resolve(),authUser=null,authNotice='',authGeneration=0;
 const setCs=m=>{$('cloud').textContent=m};
-function sync(){if(rdb)sq=sq.then(doSync)}
-async function doSync(){try{const col=rdb.collection('data/users/'+uid),now={};
-db.products.forEach(p=>now['p'+p.code]=p);db.invoices.forEach(r=>now['i'+r.n]=r);now.meta={store:db.store||'',n:db.n,caja:db.caja||{open:false},cats:db.cats||[],clients:db.clients||[],branches:db.branches||[],branch:db.branch||''};
-for(const k in now){const s=JSON.stringify(now[k]);if(sy[k]!==s){await col.doc(k).set(now[k]);sy[k]=s}}
-for(const k in sy)if(!(k in now)){await col.doc(k).delete();delete sy[k]}
-setCs('☁ Guardado en la nube')}catch(e){setCs('☁ No se pudo sincronizar')}}
-async function initCloud(){try{const [d,u]=await Promise.all([claude.use('db'),claude.use('user')]);
-if(!d||!u){setCs('Sin nube: inicia sesión en claude.ai (datos solo en este teléfono)');return}
-uid=await u.id();if(!uid)return;const col=d.collection('data/users/'+uid);setCs('☁ Conectando…');
-const snap=await col.get();
-snap.docs.forEach(s=>{const x=s.data(),k=s.id;sy[k]=JSON.stringify(x);
-if(k==='meta'){if(x.store)db.store=x.store;db.n=Math.max(db.n,x.n||0);if(x.caja)db.caja=x.caja;if(x.cats&&x.cats.length)db.cats=x.cats;if(x.clients&&x.clients.length)db.clients=x.clients;if(x.branches&&x.branches.length)db.branches=x.branches;if(x.branch)db.branch=x.branch}
-else if(k[0]==='p'){const i=db.products.findIndex(p=>p.code===x.code);i<0?db.products.push(x):db.products[i]=x}
-else{const i=db.invoices.findIndex(r=>r.n===x.n);i<0?db.invoices.push(x):db.invoices[i]=x;db.n=Math.max(db.n,x.n)}});
-db.invoices.sort((a,b)=>a.n-b.n);rdb=d;save();rP();rHome();rCatSel();rCl();rUsr();$('brand').textContent='🌹 '+(db.store||'Seven Roses')}catch(e){setCs('Sin nube (datos solo en este teléfono)')}}
-db.caja=db.caja||{open:false};rP();rI();rHome();rCatSel();rCl();rUsr();$('brand').textContent='🌹 '+(db.store||'Seven Roses');initCloud();
+function showAuth(message){$('authMessage').textContent=message;$('authGate').classList.add('on');$('authBtn').disabled=false}
+function saveLocal(){try{localStorage.setItem(K,JSON.stringify(db))}catch(e){console.error('No se pudo guardar en este dispositivo',e);setCs('No se pudo guardar en este dispositivo')}}
+function sync(){if(!rdb)return;sq=sq.then(doSync).catch(e=>{console.error('Error al sincronizar con Firestore',e);setCs('Error de sincronización: '+(e.message||e.code||'revisa la conexión'))})}
+function cloudDocs(){const docs={};
+const meta={};for(const k of ['store','n','caja','cats','clients','branches','branch','entries','fin','cierres'])if(db[k]!==undefined)meta[k]=db[k];
+docs[CLOUD_PREFIX+'meta']={type:'meta',data:meta};
+db.products.forEach(p=>docs[CLOUD_PREFIX+'product_'+encodeURIComponent(p.code)]={type:'product',data:p});
+db.invoices.forEach(r=>docs[CLOUD_PREFIX+'invoice_'+r.n]={type:'invoice',data:r});
+return docs}
+async function doSync(){const now=cloudDocs(),writes=[],next={...sy};
+for(const id in now){const value=JSON.stringify(now[id]),data=JSON.parse(value);if(sy[id]!==value){writes.push({id,data});next[id]=value}}
+for(const id in sy)if(!(id in now)){writes.push({id,remove:true});delete next[id]}
+for(let i=0;i<writes.length;i+=400){const batch=fdb.batch();writes.slice(i,i+400).forEach(w=>{const ref=rdb.doc(w.id);if(w.remove)batch.delete(ref);else batch.set(ref,w.data)});await batch.commit()}
+sy=next;setCs('☁ Guardado en Firebase')}
+function save(){saveLocal();sync()}
+async function loadCloud(userId){setCs('☁ Conectando con Firebase…');
+const col=fdb.collection('facturasUsers').doc(userId).collection('records'),snap=await col.get(),docs=snap.docs.filter(s=>s.id.startsWith(CLOUD_PREFIX));
+rdb=col;uid=userId;sy={};docs.forEach(s=>sy[s.id]=JSON.stringify(s.data()));
+if(docs.length){const loaded={products:[],invoices:[],n:0,caja:{open:false}};
+docs.forEach(s=>{const x=s.data();if(x.type==='meta')Object.assign(loaded,x.data||{});else if(x.type==='product'&&x.data)loaded.products.push(x.data);else if(x.type==='invoice'&&x.data)loaded.invoices.push(x.data)});
+loaded.products=loaded.products||[];loaded.invoices=loaded.invoices||[];loaded.caja=loaded.caja||{open:false};loaded.invoices.sort((a,b)=>a.n-b.n);db=loaded;saveLocal()}
+else await doSync();
+rP();rI();rHome();rCatSel();rCl();rUsr();$('brand').textContent='🌹 '+(db.store||'Seven Roses')}
+async function signIn(){authNotice='';$('authBtn').disabled=true;$('authMessage').textContent='Abriendo el acceso de Google…';
+try{if(/iPhone|iPad|Android/i.test(navigator.userAgent))await fauth.signInWithRedirect(googleProvider);else await fauth.signInWithPopup(googleProvider)}
+catch(e){console.error('No se pudo iniciar sesión con Google',e);showAuth(e.code==='auth/unauthorized-domain'?'Agrega marianaupana-hub.github.io a los dominios autorizados de Firebase Authentication.':'No se pudo iniciar sesión: '+(e.message||e.code))}}
+async function signOut(){try{await fauth.signOut()}catch(e){console.error('No se pudo cerrar sesión',e);toast('No se pudo cerrar sesión: '+(e.message||e.code))}}
+fauth.onAuthStateChanged(async user=>{const generation=++authGeneration;
+if(!user){authUser=null;rdb=null;uid=null;sy={};setCs('☁ Inicia sesión para conectar Firebase');showAuth(authNotice||'Inicia sesión con la cuenta administradora para conectar Firestore.');return}
+showAuth('Verificando cuenta administradora…');$('authBtn').disabled=true;
+try{if(user.uid!==ADMIN_UID)throw new Error('Esta cuenta de Google no corresponde al administrador autorizado.');
+const admin=await fdb.collection('admins').doc(user.uid).get();if(!admin.exists)throw new Error('La cuenta no tiene acceso de administrador en Firestore.');
+await loadCloud(user.uid);if(generation!==authGeneration)return;authUser=user;authNotice='';$('authGate').classList.remove('on');rUsr()}
+catch(e){if(generation!==authGeneration)return;console.error('No se pudo validar la cuenta o cargar Firestore',e);authNotice=e.message||'No se pudo conectar con Firestore.';await fauth.signOut()}})
+db.caja=db.caja||{open:false};rP();rI();rHome();rCatSel();rCl();rUsr();$('brand').textContent='🌹 '+(db.store||'Seven Roses');
 </script></body></html>
