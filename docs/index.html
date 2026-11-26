@@ -63,6 +63,8 @@ main{padding:14px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.pt{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px;text-align:left;color:var(--tx);font-weight:400}
 .modal{display:none;position:fixed;inset:0;background:#000c;z-index:40;padding:16px;overflow:auto;align-items:center;justify-content:center}.modal.on{display:flex}.modal .card{width:100%;max-width:420px;margin:0}
 .auth-gate{display:none;position:fixed;inset:0;background:#0e0e10;z-index:200;align-items:center;justify-content:center;padding:20px}.auth-gate.on{display:flex}.auth-gate .card{width:100%;max-width:420px;text-align:center}.auth-gate button{width:100%;margin-top:12px}
+.label-grid{display:grid;grid-template-columns:repeat(3,40mm);gap:2mm;justify-content:center;margin:12px auto}.barcode-label{width:40mm;height:20mm;box-sizing:border-box;border:.2mm solid #aaa;padding:.6mm;display:flex;flex-direction:column;align-items:center;justify-content:space-between;overflow:hidden;background:#fff;color:#000;font-family:Arial,sans-serif}.label-head,.label-foot{width:100%;height:3mm;display:flex;align-items:center;justify-content:space-between;gap:1mm;white-space:nowrap;overflow:hidden;font-size:6pt;line-height:1}.label-name{overflow:hidden;text-overflow:ellipsis}.label-price{font-size:7pt;font-weight:bold}.label-barcode{display:block;width:35mm;height:10mm;max-width:100%}.label-code{font-size:5pt}
+@media print{@page{size:A4 portrait;margin:8mm}body{padding:0!important;background:#fff!important;color:#000!important}body>:not(#mod){display:none!important}#mod{display:block!important;position:static!important;inset:auto!important;padding:0!important;overflow:visible!important;background:transparent!important}#modc{display:block!important;width:auto!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;color:#000!important}#printLabelsPanel .no-print{display:none!important}#printLabelsPanel .label-grid{grid-template-columns:repeat(3,40mm)!important;gap:2mm!important;margin:0 auto!important;justify-content:center!important}.barcode-label{break-inside:avoid;page-break-inside:avoid}}
 
 </style></head><body>
 <div id="authGate" class="auth-gate on"><div class="card"><div style="font-size:38px">🌹</div><h2>Seven Roses</h2><p id="authMessage" class="mu">Inicia sesión con la cuenta administradora para conectar Firestore.</p><button id="authBtn" onclick="signIn()">Continuar con Google</button></div></div>
@@ -87,6 +89,7 @@ main{padding:14px}
 <small style="margin-top:8px">Cada combinación de nombre + talla + color tiene su propio código. Si ya existe, se suma la cantidad.</small>
 </div>
 <div class="r2" style="margin-bottom:8px"><input id="q" placeholder="Buscar por nombre o código" oninput="rP()" style="margin:0"><button style="flex:0 0 auto" onclick="openScan(c=>{q.value=c;rP()})">📷 Escanear</button></div>
+<button class="g" style="width:100%;margin-bottom:8px" onclick="printLabels()">🖨 Imprimir etiquetas / Guardar PDF</button>
 <div id="plist"></div>
 </section>
 
@@ -184,6 +187,14 @@ const code=ean(name+'|'+size+'|'+color),duplicate=db.products.find(x=>x!==p&&x.c
 if(duplicate)return toast('Ya existe un producto con ese nombre, talla y color');
 Object.assign(p,{code,name,cat:$('epc').value,brand:$('epb').value.trim(),size,color,price,cost,stock,img:editImgData});
 save();closeMod();rP();rPOS();toast('Producto actualizado')}
+function printLabels(){const products=db.products.filter(p=>Math.floor(Number(p.stock)||0)>0);if(!products.length)return toast('No hay existencias para imprimir etiquetas');
+try{const labels=[];let total=0;
+products.forEach(p=>{const qty=Math.floor(Number(p.stock)||0),svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('label-barcode');
+JsBarcode(svg,p.code,{format:'EAN13',width:1.1,height:30,displayValue:false,margin:0});
+const barcode=new XMLSerializer().serializeToString(svg);
+for(let i=0;i<qty;i++){labels.push(`<article class="barcode-label"><div class="label-head"><span class="label-name">${esc(p.name)}</span><span class="label-price">${money(p.price)}</span></div>${barcode}<div class="label-foot"><span>${p.size?'Talla '+esc(p.size):'Talla única'}</span><span class="label-code">${esc(p.code)}</span></div></article>`);total++}});
+modc.innerHTML=`<div id="printLabelsPanel"><div class="no-print"><h2>Etiquetas de productos</h2><p class="mu">${total} etiqueta(s) · 4 × 2 cm · 3 columnas · una por unidad en existencia</p><p class="mu">La impresión usa el inventario actual. Si cambia el stock, cierra y vuelve a generar las etiquetas. Un PDF guardado no se actualiza automáticamente.</p><div class="r2"><button class="g" onclick="closeMod()">Cerrar</button><button onclick="window.print()">Imprimir / Guardar PDF</button></div></div><div class="label-grid">${labels.join('')}</div></div>`;
+mod.classList.add('on')}catch(e){console.error('No se pudieron generar las etiquetas',e);toast('No se pudieron generar las etiquetas: '+(e.message||'revisa los códigos de barras'))}}
 function delP(c){if(confirm('¿Borrar este producto?')){db.products=db.products.filter(x=>x.code!==c);save();rP()}}
 let pimgData='';
 function pickImg(inp){const f=inp.files[0];if(!f)return;const im=new Image();im.onload=()=>{const k=Math.min(1,240/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);pimgData=c.toDataURL('image/jpeg',.6);ppv.src=pimgData;ppv.style.display='block';URL.revokeObjectURL(im.src)};im.src=URL.createObjectURL(f);inp.value=''}
