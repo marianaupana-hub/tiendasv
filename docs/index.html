@@ -282,6 +282,10 @@ const DATA_OWNER_UID='CebhzopoNTX70krUuVqv7aELAew2',SHARED_MANAGER_UID='bl2RfPTM
 let rdb=null,uid=null,sy={},sq=Promise.resolve(),authUser=null,authNotice='',authGeneration=0;
 const setCs=m=>{$('cloud').textContent=m};
 function showAuth(message){$('authMessage').textContent=message;$('authGate').classList.add('on');$('authBtn').disabled=false}
+function authErrorMessage(e){if(e.code==='auth/unauthorized-domain')return'Este dominio no está autorizado en Firebase Authentication.';
+if(e.code==='auth/operation-not-allowed')return'El acceso con Google no está habilitado en Firebase Authentication.';
+if(e.code==='auth/popup-closed-by-user')return'Se cerró la ventana de Google antes de completar el acceso.';
+return'No se pudo iniciar sesión: '+(e.message||e.code||'error desconocido')}
 function saveLocal(){try{localStorage.setItem(K,JSON.stringify(db))}catch(e){console.error('No se pudo guardar en este dispositivo',e);setCs('No se pudo guardar en este dispositivo')}}
 function sync(){if(!rdb)return;sq=sq.then(doSync).catch(e=>{console.error('Error al sincronizar con Firestore',e);setCs('Error de sincronización: '+(e.message||e.code||'revisa la conexión'))})}
 function cloudDocs(){const docs={};
@@ -305,9 +309,11 @@ loaded.products=loaded.products||[];loaded.invoices=loaded.invoices||[];loaded.c
 else await doSync();
 rP();rI();rHome();rCatSel();rCl();rUsr();$('brand').textContent='🌹 '+(db.store||'Seven Roses')}
 async function signIn(){authNotice='';$('authBtn').disabled=true;$('authMessage').textContent='Abriendo el acceso de Google…';
-try{if(/iPhone|iPad|Android/i.test(navigator.userAgent))await fauth.signInWithRedirect(googleProvider);else await fauth.signInWithPopup(googleProvider)}
-catch(e){console.error('No se pudo iniciar sesión con Google',e);showAuth(e.code==='auth/unauthorized-domain'?'Agrega marianaupana-hub.github.io a los dominios autorizados de Firebase Authentication.':'No se pudo iniciar sesión: '+(e.message||e.code))}}
+try{await fauth.signInWithPopup(googleProvider)}
+catch(e){if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment'){try{await fauth.signInWithRedirect(googleProvider);return}catch(redirectError){e=redirectError}}
+console.error('No se pudo iniciar sesión con Google',e);showAuth(authErrorMessage(e))}}
 async function signOut(){try{await fauth.signOut()}catch(e){console.error('No se pudo cerrar sesión',e);toast('No se pudo cerrar sesión: '+(e.message||e.code))}}
+fauth.getRedirectResult().catch(e=>{console.error('No se pudo completar el acceso con redirección',e);authNotice=authErrorMessage(e);showAuth(authNotice)});
 fauth.onAuthStateChanged(async user=>{const generation=++authGeneration;
 if(!user){authUser=null;rdb=null;uid=null;sy={};setCs('☁ Inicia sesión para conectar Firebase');showAuth(authNotice||'Inicia sesión con la cuenta administradora para conectar Firestore.');return}
 showAuth('Verificando cuenta administradora…');$('authBtn').disabled=true;
