@@ -155,7 +155,35 @@ else{db.products.push({code,name,img:pimgData,cat:pc.value,brand:pb.value.trim()
 save();[pn,pp,pco,pb,ps,pk].forEach(e=>e.value='');pq.value=1;pimgData='';ppv.style.display='none';rP()}
 function rP(){const f=norm(q.value);const l=db.products.filter(p=>!f||txt(p).includes(f)||p.code.includes(f));
 plist.innerHTML=l.map(p=>`<div class="card"><div class="row" style="border:0;padding:0">${p.img?`<img class="ph" src="${p.img}">`:''}<div class="grow"><b>${esc(p.name)}</b><div><span class="tag">${esc(p.cat||'')}</span>${p.brand?`<span class="tag">${esc(p.brand)}</span>`:''}${p.size?`<span class="tag">Talla ${esc(p.size)}</span>`:''}${p.color?`<span class="tag">${esc(p.color)}</span>`:''}</div><small>${money(p.price)} · Stock: ${p.stock}</small></div></div><div class="bc"><svg class="bc" data-c="${p.code}"></svg></div><div class="r2"><button onclick="addByCode('${p.code}');tab('f')">+ Carrito</button><button class="g" onclick="editP('${p.code}')">Editar</button><button class="d" onclick="delP('${p.code}')">Borrar</button></div></div>`).join('')||'<p class="mu">Sin productos todavía.</p>';bcs(plist)}
-function editP(c){const p=db.products.find(x=>x.code===c);const v=prompt('Precio de '+p.name,p.price);if(v===null)return;const s=prompt('Cantidad en existencia',p.stock);if(!isNaN(parseFloat(v)))p.price=parseFloat(v);if(s!==null&&!isNaN(parseInt(s)))p.stock=parseInt(s);save();rP()}
+let editImgData='';
+function editP(c){const p=db.products.find(x=>x.code===c);if(!p)return;
+editImgData=p.img||'';
+const options=[...new Set([...cats(),p.cat||'Otros'])].map(v=>`<option value="${esc(v)}"${v===(p.cat||'Otros')?' selected':''}>${esc(v)}</option>`).join('');
+modc.innerHTML=`<h2>Editar producto</h2><label class="mu">Nombre</label><input id="epn" value="${esc(p.name)}" autocomplete="off">
+<div class="r2"><div><label class="mu">Categoría</label><select id="epc">${options}</select></div><div><label class="mu">Marca</label><input id="epb" value="${esc(p.brand||'')}"></div></div>
+<div class="r2"><div><label class="mu">Talla</label><input id="eps" value="${esc(p.size||'')}"></div><div><label class="mu">Color</label><input id="epk" value="${esc(p.color||'')}"></div></div>
+<div class="r2"><div><label class="mu">Precio de venta (Q)</label><input id="epp" type="number" min="0" step="0.01" value="${Number(p.price)||0}"></div><div><label class="mu">Costo (Q)</label><input id="epco" type="number" min="0" step="0.01" value="${Number(p.cost)||0}"></div></div>
+<label class="mu">Existencias</label><input id="epq" type="number" min="0" step="1" value="${Number(p.stock)||0}">
+<div class="r2" style="align-items:center;margin-bottom:8px"><button class="g" onclick="$('epimg').click()">📷 Cambiar foto</button><img id="eppv" src="${editImgData}" style="display:${editImgData?'block':'none'};height:56px;width:56px;border-radius:8px;object-fit:cover"><button class="d" onclick="removeEditImg()">Quitar foto</button></div>
+<input id="epimg" type="file" accept="image/*" style="display:none" onchange="pickEditImg(this)">
+<small>El código de barras se actualizará si cambias nombre, talla o color.</small>
+<div class="r2" style="margin-top:12px"><button class="g" onclick="closeMod()">Cancelar</button><button onclick="saveEditP('${p.code}')">Guardar cambios</button></div>`;
+mod.classList.add('on')}
+function pickEditImg(inp){const f=inp.files[0];if(!f)return;const url=URL.createObjectURL(f),im=new Image();
+im.onload=()=>{try{const k=Math.min(1,240/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);const ctx=c.getContext('2d');if(!ctx)throw new Error('No se pudo procesar la foto');ctx.drawImage(im,0,0,c.width,c.height);editImgData=c.toDataURL('image/jpeg',.6);$('eppv').src=editImgData;$('eppv').style.display='block'}catch(e){console.error('No se pudo procesar la foto del producto',e);toast(e.message)}finally{URL.revokeObjectURL(url)}};
+im.onerror=()=>{URL.revokeObjectURL(url);toast('No se pudo abrir la foto seleccionada')};im.src=url;inp.value=''}
+function removeEditImg(){editImgData='';$('eppv').removeAttribute('src');$('eppv').style.display='none'}
+function saveEditP(c){const p=db.products.find(x=>x.code===c);if(!p)return;
+const name=$('epn').value.trim(),size=$('eps').value.trim(),color=$('epk').value.trim(),priceText=$('epp').value.trim(),costText=$('epco').value.trim(),stockText=$('epq').value.trim();
+if(!name)return toast('Escribe el nombre del producto');
+const price=Number(priceText),cost=Number(costText),stock=Number(stockText);
+if(!priceText||!Number.isFinite(price)||price<0)return toast('Escribe un precio válido');
+if(!costText||!Number.isFinite(cost)||cost<0)return toast('Escribe un costo válido');
+if(!stockText||!Number.isInteger(stock)||stock<0)return toast('Escribe existencias válidas');
+const code=ean(name+'|'+size+'|'+color),duplicate=db.products.find(x=>x!==p&&x.code===code);
+if(duplicate)return toast('Ya existe un producto con ese nombre, talla y color');
+Object.assign(p,{code,name,cat:$('epc').value,brand:$('epb').value.trim(),size,color,price,cost,stock,img:editImgData});
+save();closeMod();rP();rPOS();toast('Producto actualizado')}
 function delP(c){if(confirm('¿Borrar este producto?')){db.products=db.products.filter(x=>x.code!==c);save();rP()}}
 let pimgData='';
 function pickImg(inp){const f=inp.files[0];if(!f)return;const im=new Image();im.onload=()=>{const k=Math.min(1,240/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);pimgData=c.toDataURL('image/jpeg',.6);ppv.src=pimgData;ppv.style.display='block';URL.revokeObjectURL(im.src)};im.src=URL.createObjectURL(f);inp.value=''}
