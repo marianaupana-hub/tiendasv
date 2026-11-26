@@ -278,7 +278,7 @@ const firebaseConfig={apiKey:'AIzaSyArhik2SVlLuD7HoeZ_Oj2oeSPDuhDXs2w',authDomai
 firebase.initializeApp(firebaseConfig);
 const fauth=firebase.auth(),fdb=firebase.firestore(),googleProvider=new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({prompt:'select_account'});
-const ADMIN_UID='CebhzopoNTX70krUuVqv7aELAew2',CLOUD_PREFIX='sevenroses_v1_';
+const DATA_OWNER_UID='CebhzopoNTX70krUuVqv7aELAew2',SHARED_MANAGER_UID='bl2RfPTMp5h7opLSoPQh5MgdpM72',CLOUD_PREFIX='sevenroses_v1_';
 let rdb=null,uid=null,sy={},sq=Promise.resolve(),authUser=null,authNotice='',authGeneration=0;
 const setCs=m=>{$('cloud').textContent=m};
 function showAuth(message){$('authMessage').textContent=message;$('authGate').classList.add('on');$('authBtn').disabled=false}
@@ -311,9 +311,9 @@ async function signOut(){try{await fauth.signOut()}catch(e){console.error('No se
 fauth.onAuthStateChanged(async user=>{const generation=++authGeneration;
 if(!user){authUser=null;rdb=null;uid=null;sy={};setCs('☁ Inicia sesión para conectar Firebase');showAuth(authNotice||'Inicia sesión con la cuenta administradora para conectar Firestore.');return}
 showAuth('Verificando cuenta administradora…');$('authBtn').disabled=true;
-try{if(user.uid!==ADMIN_UID)throw new Error('Esta cuenta de Google no corresponde al administrador autorizado.');
-const admin=await fdb.collection('admins').doc(user.uid).get();if(!admin.exists)throw new Error('La cuenta no tiene acceso de administrador en Firestore.');
-await loadCloud(user.uid);if(generation!==authGeneration)return;authUser=user;authNotice='';$('authGate').classList.remove('on');rUsr()}
+try{const admin=await fdb.collection('admins').doc(user.uid).get();if(!admin.exists)throw new Error('La cuenta no tiene acceso de administrador en Firestore.');
+const role=admin.data().role||'owner';if(user.uid!==DATA_OWNER_UID&&!(user.uid===SHARED_MANAGER_UID&&role==='manager'))throw new Error('La cuenta no está autorizada para Seven Roses.');
+await loadCloud(DATA_OWNER_UID);if(generation!==authGeneration)return;authUser=user;authNotice='';$('authGate').classList.remove('on');rUsr()}
 catch(e){if(generation!==authGeneration)return;console.error('No se pudo validar la cuenta o cargar Firestore',e);authNotice=e.message||'No se pudo conectar con Firestore.';await fauth.signOut()}})
 db.caja=db.caja||{open:false};rP();rI();rHome();rCatSel();rCl();rUsr();$('brand').textContent='🌹 '+(db.store||'Seven Roses');
 </script></body></html>

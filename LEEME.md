@@ -20,16 +20,14 @@ En GitHub, abre Settings > Pages y selecciona la rama `main` y la carpeta `/docs
 La página estará en https://marianaupana-hub.github.io/tiendasv/
 
 ## Firebase
-La app inicia sesión con Google y verifica que la cuenta corresponda al administrador
-registrado en `admins/CebhzopoNTX70krUuVqv7aELAew2`. En Firebase Console, habilita
-Google en Authentication > Sign-in method y agrega `marianaupana-hub.github.io` en
-Authentication > Settings > Authorized domains.
+La app inicia sesión con Google y valida el rol en `admins/{uid}`. En Firebase
+Console, habilita Google en Authentication > Sign-in method y agrega
+`marianaupana-hub.github.io` en Authentication > Settings > Authorized domains.
 
-Los datos de Seven Roses se guardan por usuario en
-`facturasUsers/{uid}/records/sevenroses_v1_*`; la app conserva los demás registros.
-Las reglas de Firestore deben permitir leer y escribir en
-`facturasUsers/{userId}/records/{recordId}` solo cuando
-`request.auth.uid == userId`.
+Los datos compartidos de Seven Roses se guardan en
+`facturasUsers/CebhzopoNTX70krUuVqv7aELAew2/records/sevenroses_v1_*`; la app conserva
+los demás registros. Las reglas permiten al propietario acceder a sus registros y
+al UID autorizado `bl2RfPTMp5h7opLSoPQh5MgdpM72` compartirlos con rol `manager`.
 
 ## Datos
 Se guardan en el navegador y se sincronizan con Firebase al iniciar sesión. Respalda
