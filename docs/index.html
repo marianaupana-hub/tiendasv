@@ -136,6 +136,7 @@ main{padding:14px}
 
 <section id="s-h">
 <h2>Historial</h2>
+<div class="chips" id="historyFilters"></div>
 <div id="hist"></div>
 <div class="card" id="invoiceExports"><b>Excel / Google Sheets</b><small style="margin-bottom:8px">Descarga tus datos como CSV; se abren directo en Excel o Google Sheets.</small>
 <div class="r2"><button class="g" onclick="csvP()">Productos</button><button class="g" onclick="csvF()">Facturas</button></div></div>
@@ -330,7 +331,7 @@ const cash=payments.find(payment=>payment.method==='Efectivo');if(cash){const va
 else{payments=[{method:pm,amount:t}];if(pm==='Efectivo'){const value=$('rec').value.trim();recv=value===''?t:Number(value);if(!Number.isFinite(recv)||recv<t)return toast('El efectivo recibido es menor al total');change=recv-t}
 if(pm==='Crédito'&&!cur.name.trim())return toast('Escribe el nombre del cliente')}
 const cashAmount=payments.filter(payment=>payment.method==='Efectivo').reduce((sum,payment)=>sum+payment.amount,0),debt=payments.filter(payment=>payment.method==='Crédito').reduce((sum,payment)=>sum+payment.amount,0);
-const v={id:crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'_'+Math.random().toString(36).slice(2),n:++db.n,date:new Date().toLocaleString('es-GT'),day:today(),name:nm,phone:cur.phone,pay:pm,payments,items:cur.items,total:t,sub:cur.items.reduce((s,i)=>s+i.price*i.qty,0),recv,change,debt,branch:db.branch||'Principal',createdBy:authUser&&authUser.uid||''};
+const v={id:crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'_'+Math.random().toString(36).slice(2),n:++db.n,date:new Date().toLocaleString('es-GT'),day:today(),name:nm,phone:cur.phone,pay:pm,payments,items:cur.items,total:t,sub:cur.items.reduce((s,i)=>s+i.price*i.qty,0),recv,change,debt,branch:db.branch||'Principal',createdBy:authUser&&authUser.uid||'',createdByName:authUser&&authUser.displayName||''};
 v.items.forEach(i=>{const p=db.products.find(x=>x.code===i.code);if(p)p.stock-=i.qty});
 if(cashAmount>0)db.caja.bal+=cashAmount;
 db.invoices.push(v);if(can('clients')&&nm!=='Consumidor Final'&&!(db.clients=db.clients||[]).some(x=>x.name===nm))db.clients.push({name:nm,phone:cur.phone||''});
@@ -382,8 +383,13 @@ function out(blob,name,type,share){const f=new File([blob],name,{type});
 if(share&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:name}).catch(()=>{});return}
 const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove()}
 /* Historial */
-function rHist(){if(!can('orders'))return toast('No tienes permiso para ver pedidos');const invoices=(authRole==='staff'?db.invoices.filter(r=>r.createdBy===authUser.uid):db.invoices).slice().reverse();
-hist.innerHTML=invoices.map(r=>`<div class="card"><b>#${String(r.n).padStart(4,'0')} · ${esc(r.name)}</b><small>${r.date} · ${esc(r.pay==='Mixto'?paymentSummary(r):(r.pay||'Efectivo'))} · ${r.items.length} producto(s)</small><div class="tot" style="margin:6px 0">${money(r.total)}${r.debt>0?` <span class="tag">Debe ${money(r.debt)}</span>`:''}</div><div class="r2"><button class="g" style="padding:10px 4px" onclick="ticket(db.invoices.find(x=>x.id==='${esc(r.id||'')}'||x.n===${r.n}),false)">Ticket</button><button class="g" style="padding:10px 4px" onclick="pdf(db.invoices.find(x=>x.id==='${esc(r.id||'')}'||x.n===${r.n}),false)">Factura</button>${authRole==='staff'?'':`<button style="padding:10px 4px" onclick="wa(${r.n})">WhatsApp</button><button class="d" style="padding:10px 4px" onclick="delF(${r.n})">Borrar</button>`}</div></div>`).join('')||'<p class="mu">Aún no hay pedidos registrados por esta cuenta.</p>';
+function rHist(){if(!can('orders'))return toast('No tienes permiso para ver pedidos');
+const all=authRole==='staff'?db.invoices.filter(r=>r.createdBy===authUser.uid):db.invoices,sellers=['Todos',...new Set(all.map(sellerLabel))];
+if(!sellers.includes(historySeller))historySeller='Todos';
+historyFilters.innerHTML=isManager()?sellers.map((name,index)=>`<button class="chip ${historySeller===name?'on':''}" data-seller-index="${index}">${esc(name==='Todos'?'Todas':name)}</button>`).join(''):'';
+historyFilters.querySelectorAll('button[data-seller-index]').forEach(button=>button.addEventListener('click',()=>{historySeller=sellers[Number(button.dataset.sellerIndex)]||'Todos';rHist()}));
+const invoices=all.filter(r=>historySeller==='Todos'||sellerLabel(r)===historySeller).slice().reverse();
+hist.innerHTML=invoices.map(r=>`<div class="card"><b>#${String(r.n).padStart(4,'0')} · ${esc(r.name)}</b><small>${r.date} · Registró: ${esc(sellerLabel(r))} · ${esc(r.pay==='Mixto'?paymentSummary(r):(r.pay||'Efectivo'))} · ${r.items.length} producto(s)</small><div class="tot" style="margin:6px 0">${money(r.total)}${r.debt>0?` <span class="tag">Debe ${money(r.debt)}</span>`:''}</div><div class="r2"><button class="g" style="padding:10px 4px" onclick="ticket(db.invoices.find(x=>x.id==='${esc(r.id||'')}'||x.n===${r.n}),false)">Ticket</button><button class="g" style="padding:10px 4px" onclick="pdf(db.invoices.find(x=>x.id==='${esc(r.id||'')}'||x.n===${r.n}),false)">Factura</button>${authRole==='staff'?'':`<button style="padding:10px 4px" onclick="wa(${r.n})">WhatsApp</button><button class="d" style="padding:10px 4px" onclick="delF(${r.n})">Borrar</button>`}</div></div>`).join('')||'<p class="mu">No hay ventas de esta persona en el historial.</p>';
 $('invoiceExports').style.display=authRole==='staff'?'none':''}
 function delF(n){if(!isManager())return toast('Solo administración puede borrar ventas');if(confirm('¿Borrar venta?')){db.invoices=db.invoices.filter(x=>x.n!==n);save();rHist()}}
 const cv=v=>'"'+String(v).replace(/"/g,'""')+'"';
@@ -397,7 +403,8 @@ googleProvider.setCustomParameters({prompt:'select_account'});
 const DATA_OWNER_UID='CebhzopoNTX70krUuVqv7aELAew2',SHARED_MANAGER_UID='bl2RfPTMp5h7opLSoPQh5MgdpM72',CLOUD_PREFIX='sevenroses_v1_';
 const STAFF_ACCOUNTS=[{uid:'xuVZvF01nxaRoeW6CNaGSJM0XOr2',email:'qsucely786@gmail.com',name:'Qsucely'},{uid:'OoTb1PYzrreBF57Ci4ZvfoMhtCg2',email:'cuyaneimi@gmail.com',name:'Cuyaneimi'}];
 const STAFF_MODULES=[{key:'dashboard',tab:'i',label:'Dashboard'},{key:'pos',tab:'f',label:'Punto de Venta'},{key:'orders',tab:'h',label:'Historial de ventas / pedidos propios'},{key:'stock',tab:'e',label:'Entradas de stock'},{key:'reports',tab:'r',label:'Reportes'},{key:'finance',tab:'n',label:'Finanzas'},{key:'products',tab:'p',label:'Productos'},{key:'categories',tab:'c',label:'Categorías'},{key:'clients',tab:'u',label:'Clientes'},{key:'branches',tab:'b',label:'Sucursales'}];
-let rdb=null,uid=null,sy={},sq=Promise.resolve(),authUser=null,authRole='',userPermissions={},authNotice='',authGeneration=0,adminUnsub=null,teamUnsub=null,teamDocs={},staffBaseline=null;
+function sellerLabel(invoice){const id=invoice&&invoice.createdBy;if(!id)return'Sin identificar (registro previo)';if(id===DATA_OWNER_UID)return invoice.createdByName||'Mariana (propietaria)';if(id===SHARED_MANAGER_UID)return invoice.createdByName||'Angie';const account=STAFF_ACCOUNTS.find(a=>a.uid===id);return account?account.name:(invoice.createdByName||'Usuario autorizado')}
+let rdb=null,uid=null,sy={},sq=Promise.resolve(),authUser=null,authRole='',userPermissions={},authNotice='',authGeneration=0,adminUnsub=null,teamUnsub=null,teamDocs={},staffBaseline=null,historySeller='Todos';
 const isManager=()=>authRole==='owner'||authRole==='manager';
 const can=permission=>isManager()||(authRole==='staff'&&userPermissions[permission]===true);
 function permissionForTab(t){const module=STAFF_MODULES.find(m=>m.tab===t);return module&&module.key}

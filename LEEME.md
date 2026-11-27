@@ -37,6 +37,8 @@ las que no tengan permiso aparecen deshabilitadas. Se pueden autorizar Dashboard
 Punto de Venta, pedidos propios, entradas de stock, Reportes, Finanzas, Productos,
 Categorías, Clientes y Sucursales. **Equipo y permisos**, exportaciones, retiros,
 cierre de caja y cobro de deudas siguen reservados para administración.
+El historial muestra y permite filtrar las ventas por quien inició sesión al
+registrarlas; solo la propietaria y Angie pueden borrar ventas, no el personal.
 
 Los permisos de Productos y Reportes incluyen acceso a los costos de compra; Finanzas
 incluye datos de ventas y caja; Dashboard muestra resumen de ventas y caja; Clientes
