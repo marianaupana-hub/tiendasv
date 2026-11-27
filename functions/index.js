@@ -24,6 +24,9 @@ function escapeHtml(value) {
 
 function formatSale(invoice) {
   const items = Array.isArray(invoice.items) ? invoice.items : [];
+  const payments = Array.isArray(invoice.payments) && invoice.payments.length
+    ? invoice.payments
+    : [{ method: invoice.pay || 'No especificada', amount: Number(invoice.total) || 0 }];
   const lines = items.slice(0, 100).map((item) => {
     const quantity = Math.max(0, Number(item.qty) || 0);
     const name = String(item.name || 'Producto').replace(/[\r\n]/g, ' ').slice(0, 200);
@@ -31,6 +34,12 @@ function formatSale(invoice) {
   });
   const itemText = lines.join('\n') || 'Detalle no disponible';
   const itemHtml = lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('');
+  const paymentText = payments.map((payment) => (
+    `${String(payment.method || 'Pago').slice(0, 30)}: Q${(Number(payment.amount) || 0).toFixed(2)}`
+  )).join(' + ');
+  const paymentHtml = payments.map((payment) => (
+    `${escapeHtml(String(payment.method || 'Pago').slice(0, 30))}: Q${(Number(payment.amount) || 0).toFixed(2)}`
+  )).join(' + ');
   const number = Number(invoice.n) || 0;
   const total = Number(invoice.total);
   if (!Number.isFinite(total) || total <= 0) {
@@ -44,7 +53,7 @@ function formatSale(invoice) {
       `Venta: #${number}`,
       `Fecha: ${String(invoice.date || 'No disponible').slice(0, 100)}`,
       `Sucursal: ${String(invoice.branch || 'Principal').slice(0, 100)}`,
-      `Forma de pago: ${String(invoice.pay || 'No especificada').slice(0, 50)}`,
+      `Forma de pago: ${paymentText}`,
       `Total: Q${total.toFixed(2)}`,
       '',
       'Productos:',
@@ -54,7 +63,7 @@ function formatSale(invoice) {
       <p><b>Venta:</b> #${number}<br>
       <b>Fecha:</b> ${escapeHtml(String(invoice.date || 'No disponible').slice(0, 100))}<br>
       <b>Sucursal:</b> ${escapeHtml(String(invoice.branch || 'Principal').slice(0, 100))}<br>
-      <b>Forma de pago:</b> ${escapeHtml(String(invoice.pay || 'No especificada').slice(0, 50))}<br>
+      <b>Forma de pago:</b> ${paymentHtml}<br>
       <b>Total:</b> Q${total.toFixed(2)}</p>
       <p><b>Productos:</b></p><ul>${itemHtml || '<li>Detalle no disponible</li>'}</ul>`,
   };

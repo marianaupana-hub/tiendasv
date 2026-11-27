@@ -78,3 +78,10 @@ En Reportes puedes consultar las unidades y ventas de hoy, los últimos 7 días 
 días, además del valor estimado del inventario actual a costo y a precio de venta.
 El costo se calcula con el costo registrado por producto y las existencias actuales;
 no representa un historial de los pagos reales de cada compra.
+
+En Punto de Venta puedes cobrar una venta con un solo método o elegir **Pago mixto**
+y repartir el total entre efectivo, transferencia, tarjeta y/o crédito. El sistema
+valida que la suma coincida con el total, registra en caja solo la parte en efectivo
+y deja como deuda únicamente la parte a crédito. Los métodos y sus importes aparecen
+en tickets, facturas, WhatsApp, historial y reportes. Está disponible para toda cuenta
+con permiso de Punto de Venta, incluido el personal de Interfer.

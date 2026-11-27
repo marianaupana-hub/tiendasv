@@ -166,6 +166,61 @@ service cloud.firestore {
         product.get('stock', -1) >= 0;
     }
 
+    function validMixedPayment(data) {
+      let payments = data.get('payments', []);
+      let first = payments is list && payments.size() > 0 ? payments[0] : {};
+      let second = payments is list && payments.size() > 1 ? payments[1] : {};
+      let third = payments is list && payments.size() > 2 ? payments[2] : {};
+      let fourth = payments is list && payments.size() > 3 ? payments[3] : {};
+      let amount = first.get('amount', 0) + second.get('amount', 0) +
+        third.get('amount', 0) + fourth.get('amount', 0);
+      let creditAmount =
+        (first.get('method', '') == 'Crédito' ? first.get('amount', 0) : 0) +
+        (second.get('method', '') == 'Crédito' ? second.get('amount', 0) : 0) +
+        (third.get('method', '') == 'Crédito' ? third.get('amount', 0) : 0) +
+        (fourth.get('method', '') == 'Crédito' ? fourth.get('amount', 0) : 0);
+      let cashAmount =
+        (first.get('method', '') == 'Efectivo' ? first.get('amount', 0) : 0) +
+        (second.get('method', '') == 'Efectivo' ? second.get('amount', 0) : 0) +
+        (third.get('method', '') == 'Efectivo' ? third.get('amount', 0) : 0) +
+        (fourth.get('method', '') == 'Efectivo' ? fourth.get('amount', 0) : 0);
+      return data.get('pay', '') != 'Mixto' ||
+        (payments is list &&
+          payments.size() >= 2 &&
+          payments.size() <= 4 &&
+          first.get('method', '') in ['Efectivo', 'Transferencia', 'Tarjeta', 'Crédito'] &&
+          first.get('amount', 0) is number &&
+          first.get('amount', 0) > 0 &&
+          first.keys().hasOnly(['method', 'amount']) &&
+          second.get('method', '') in ['Efectivo', 'Transferencia', 'Tarjeta', 'Crédito'] &&
+          second.get('method', '') != first.get('method', '') &&
+          second.get('amount', 0) is number &&
+          second.get('amount', 0) > 0 &&
+          second.keys().hasOnly(['method', 'amount']) &&
+          (payments.size() < 3 ||
+            (third.get('method', '') in ['Efectivo', 'Transferencia', 'Tarjeta', 'Crédito'] &&
+              third.get('method', '') != first.get('method', '') &&
+              third.get('method', '') != second.get('method', '') &&
+              third.get('amount', 0) is number &&
+              third.get('amount', 0) > 0 &&
+              third.keys().hasOnly(['method', 'amount']))) &&
+          (payments.size() < 4 ||
+            (fourth.get('method', '') in ['Efectivo', 'Transferencia', 'Tarjeta', 'Crédito'] &&
+              fourth.get('method', '') != first.get('method', '') &&
+              fourth.get('method', '') != second.get('method', '') &&
+              fourth.get('method', '') != third.get('method', '') &&
+              fourth.get('amount', 0) is number &&
+              fourth.get('amount', 0) > 0 &&
+              fourth.keys().hasOnly(['method', 'amount']))) &&
+          amount >= data.total - 0.005 &&
+          amount <= data.total + 0.005 &&
+          data.get('debt', 0) >= creditAmount - 0.005 &&
+          data.get('debt', 0) <= creditAmount + 0.005 &&
+          data.get('recv', 0) >= cashAmount &&
+          data.get('change', 0) >= data.get('recv', 0) - cashAmount - 0.005 &&
+          data.get('change', 0) <= data.get('recv', 0) - cashAmount + 0.005);
+    }
+
     match /admins/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || isManager());
       allow list: if isManager();
@@ -350,7 +405,8 @@ service cloud.firestore {
             request.resource.data.data.items is list &&
             request.resource.data.data.items.size() > 0 &&
             request.resource.data.data.total is number &&
-            request.resource.data.data.total > 0) ||
+            request.resource.data.data.total > 0 &&
+            validMixedPayment(request.resource.data.data)) ||
           (userId == 'CebhzopoNTX70krUuVqv7aELAew2' &&
             canStaff('products') &&
             recordId.matches('sevenroses_v1_product_.*') &&
