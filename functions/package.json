@@ -1,0 +1,16 @@
+{
+  "name": "seven-roses-functions",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "lint": "node --check index.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.1",
+    "firebase-functions": "^7.4.0",
+    "nodemailer": "^10.6.1"
+  }
+}

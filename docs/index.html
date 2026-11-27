@@ -48,6 +48,7 @@ body{padding:0}section>h2{display:none}.chip{border-radius:20px}
 #menu{display:flex;flex-direction:column;gap:2px;flex:1}
 #menu button{background:none;color:var(--tx);text-align:left;padding:11px 12px;border-radius:10px;font-weight:400}
 #menu button.on{background:var(--ac);color:#1a1a1d;font-weight:600}
+#menu button:disabled{opacity:.42;cursor:not-allowed}
 .usr{border-top:1px solid var(--bd);padding-top:10px;font-size:14px}
 #topbar{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--card);border-bottom:1px solid var(--bd)}
 #topbar button{background:none;color:var(--ac);font-size:22px;padding:0 6px}#topbar span{font:600 18px Georgia,serif}
@@ -90,6 +91,7 @@ main{padding:14px}
 <div id="menu"><button class="on" data-t="i" onclick="tab('i')">📊 Dashboard</button><button data-t="f" onclick="tab('f')">🛒 Punto de Venta</button><button data-t="h" onclick="tab('h')">🧾 Historial Ventas</button><button data-t="e" onclick="tab('e')">📥 Entradas Stock</button><button data-t="r" onclick="tab('r')">📈 Reportes</button><button data-t="n" onclick="tab('n')">💰 Finanzas</button><button data-t="p" onclick="tab('p')">📦 Productos</button><button data-t="c" onclick="tab('c')">🏷 Categorías</button><button data-t="u" onclick="tab('u')">👥 Clientes</button><button data-t="b" onclick="tab('b')">🏬 Sucursales</button><button data-t="a" onclick="tab('a')">🔐 Equipo y permisos</button></div>
 <div class="usr" id="usr"></div></aside><div id="bk" onclick="side.classList.remove('open')"></div>
 <header id="topbar"><button onclick="side.classList.add('open')">☰</button><span id="ttl">Dashboard</span></header><main>
+<div id="noStaffModules" class="card" hidden>Tu cuenta está habilitada, pero no tiene módulos autorizados. Contacta a Angie o a la propietaria.</div>
 <section id="s-i" class="on"><h2>Inicio</h2><div class="card" id="caja"></div><div class="card" id="dash"></div><div class="card"><b>Deudas por cobrar</b><div id="debts"></div></div></section>
 <section id="s-p">
 <h2>Productos</h2>
@@ -168,15 +170,16 @@ function openScan(cb){$('scan').classList.add('on');try{const F=Html5QrcodeSuppo
 function closeScan(){$('scan').classList.remove('on');if(scanner){const s=scanner;scanner=null;s.stop().then(()=>s.clear()).catch(()=>{})}}
 function bcs(root){root.querySelectorAll('svg.bc').forEach(e=>{try{JsBarcode(e,e.dataset.c,{format:'EAN13',height:44,fontSize:13,margin:6,background:'#ffffff'})}catch(x){}})}
 /* Productos */
-function addP(){if(!isManager())return toast('Solo administración puede modificar productos');const name=pn.value.trim();if(!name)return toast('Escribe el nombre');const price=parseFloat(pp.value),cost=parseFloat(pco.value),qty=parseInt(pq.value)||1,size=ps.value.trim(),color=pk.value.trim(),code=ean(name+'|'+size+'|'+color);
+function addP(){if(!can('products'))return toast('No tienes permiso para modificar productos');const name=pn.value.trim();if(!name)return toast('Escribe el nombre');const price=parseFloat(pp.value),cost=parseFloat(pco.value),qty=parseInt(pq.value)||1,size=ps.value.trim(),color=pk.value.trim(),code=ean(name+'|'+size+'|'+color);
 let p=db.products.find(x=>x.code===code);
 if(p){if(pimgData)p.img=pimgData;p.stock+=qty;if(!isNaN(price))p.price=price;if(!isNaN(cost))p.cost=cost;toast('Ya existía: se sumó al stock (mismo código)')}
 else{db.products.push({code,name,img:pimgData,cat:pc.value,brand:pb.value.trim(),size,color,price:isNaN(price)?0:price,cost:isNaN(cost)?0:cost,stock:qty});toast('Producto registrado')}
 save();[pn,pp,pco,pb,ps,pk].forEach(e=>e.value='');pq.value=1;pimgData='';ppv.style.display='none';rP()}
 function rP(){const f=norm(q.value);const l=db.products.filter(p=>!f||txt(p).includes(f)||p.code.includes(f));
-plist.innerHTML=l.map(p=>`<div class="card"><div class="row" style="border:0;padding:0">${p.img?`<img class="ph" src="${p.img}">`:''}<div class="grow"><b>${esc(p.name)}</b><div><span class="tag">${esc(p.cat||'')}</span>${p.brand?`<span class="tag">${esc(p.brand)}</span>`:''}${p.size?`<span class="tag">Talla ${esc(p.size)}</span>`:''}${p.color?`<span class="tag">${esc(p.color)}</span>`:''}</div><small>${money(p.price)} · Stock: ${p.stock}</small></div></div><div class="bc"><svg class="bc" data-c="${p.code}"></svg></div><div class="r2"><button onclick="addByCode('${p.code}');tab('f')">+ Carrito</button><button class="g" onclick="editP('${p.code}')">Editar</button><button class="d" onclick="delP('${p.code}')">Borrar</button></div></div>`).join('')||'<p class="mu">Sin productos todavía.</p>';bcs(plist)}
+const form=$('s-p').querySelector('.card');form.style.display=can('products')?'':'none';
+plist.innerHTML=l.map(p=>`<div class="card"><div class="row" style="border:0;padding:0">${p.img?`<img class="ph" src="${p.img}">`:''}<div class="grow"><b>${esc(p.name)}</b><div><span class="tag">${esc(p.cat||'')}</span>${p.brand?`<span class="tag">${esc(p.brand)}</span>`:''}${p.size?`<span class="tag">Talla ${esc(p.size)}</span>`:''}${p.color?`<span class="tag">Color ${esc(p.color)}</span>`:''}</div><small>${money(p.price)} · Stock: ${p.stock}</small></div></div><div class="bc"><svg class="bc" data-c="${p.code}"></svg></div><div class="r2">${can('pos')?`<button onclick="addByCode('${p.code}');tab('f')">+ Carrito</button>`:''}${can('products')?`<button class="g" onclick="editP('${p.code}')">Editar</button><button class="d" onclick="delP('${p.code}')">Borrar</button>`:''}</div></div>`).join('')||'<p class="mu">Sin productos todavía.</p>';bcs(plist)}
 let editImgData='';
-function editP(c){if(!isManager())return toast('Solo administración puede editar productos');const p=db.products.find(x=>x.code===c);if(!p)return;
+function editP(c){if(!can('products'))return toast('No tienes permiso para editar productos');const p=db.products.find(x=>x.code===c);if(!p)return;
 editImgData=p.img||'';
 const options=[...new Set([...cats(),p.cat||'Otros'])].map(v=>`<option value="${esc(v)}"${v===(p.cat||'Otros')?' selected':''}>${esc(v)}</option>`).join('');
 modc.innerHTML=`<h2>Editar producto</h2><label class="mu">Nombre</label><input id="epn" value="${esc(p.name)}" autocomplete="off">
@@ -193,7 +196,7 @@ function pickEditImg(inp){const f=inp.files[0];if(!f)return;const url=URL.create
 im.onload=()=>{try{const k=Math.min(1,240/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);const ctx=c.getContext('2d');if(!ctx)throw new Error('No se pudo procesar la foto');ctx.drawImage(im,0,0,c.width,c.height);editImgData=c.toDataURL('image/jpeg',.6);$('eppv').src=editImgData;$('eppv').style.display='block'}catch(e){console.error('No se pudo procesar la foto del producto',e);toast(e.message)}finally{URL.revokeObjectURL(url)}};
 im.onerror=()=>{URL.revokeObjectURL(url);toast('No se pudo abrir la foto seleccionada')};im.src=url;inp.value=''}
 function removeEditImg(){editImgData='';$('eppv').removeAttribute('src');$('eppv').style.display='none'}
-function saveEditP(c){if(!isManager())return toast('Solo administración puede editar productos');const p=db.products.find(x=>x.code===c);if(!p)return;
+function saveEditP(c){if(!can('products'))return toast('No tienes permiso para editar productos');const p=db.products.find(x=>x.code===c);if(!p)return;
 const name=$('epn').value.trim(),size=$('eps').value.trim(),color=$('epk').value.trim(),priceText=$('epp').value.trim(),costText=$('epco').value.trim(),stockText=$('epq').value.trim();
 if(!name)return toast('Escribe el nombre del producto');
 const price=Number(priceText),cost=Number(costText),stock=Number(stockText);
@@ -230,56 +233,57 @@ d.text(String(p.code),x+39,y+18.5,{align:'right'});
 col++;if(col===cols){col=0;row++}}});
 const name='Etiquetas-productos-'+new Date().toISOString().slice(0,10)+'.pdf';
 out(d.output('blob'),name,'application/pdf',true)}catch(e){console.error('No se pudo crear el PDF de etiquetas',e);toast('No se pudo crear el PDF: '+(e.message||'revisa los códigos de barras'))}}
-function delP(c){if(!isManager())return toast('Solo administración puede borrar productos');if(confirm('¿Borrar este producto?')){db.products=db.products.filter(x=>x.code!==c);save();rP()}}
+function delP(c){if(!can('products'))return toast('No tienes permiso para borrar productos');if(confirm('¿Borrar este producto?')){db.products=db.products.filter(x=>x.code!==c);save();rP()}}
 let pimgData='';
 function pickImg(inp){const f=inp.files[0];if(!f)return;const im=new Image();im.onload=()=>{const k=Math.min(1,240/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);pimgData=c.toDataURL('image/jpeg',.6);ppv.src=pimgData;ppv.style.display='block';URL.revokeObjectURL(im.src)};im.src=URL.createObjectURL(f);inp.value=''}
 function openCaja(){if(!can('pos'))return toast('No tienes permiso para usar el Punto de Venta');mod.classList.add('on');modc.innerHTML=`<h2>Apertura de Caja</h2><p class="mu">Ingresa el dinero en efectivo con el que inicias el turno (para dar cambio).</p><label class="mu">Monto inicial (Q)</label><input id="mi" type="number" inputmode="decimal" value="0"><div class="r2"><button class="g" onclick="closeMod()">Cancelar</button><button onclick="abrir()">Abrir y empezar</button></div>`}
 /* Módulos */
-function rE(){const f=norm(eq.value);eh.innerHTML=f?db.products.filter(p=>txt(p).includes(f)||p.code.includes(f)).slice(0,6).map(p=>`<div class="hit" onclick="entrada('${p.code}')"><b>${esc(full(p))}</b> <small>Stock actual: ${p.stock}</small></div>`).join('')||'<small>Sin resultados</small>':'';
+function rE(){if(!can('stock'))return toast('No tienes permiso para consultar entradas de stock');const f=norm(eq.value);eh.innerHTML=f?db.products.filter(p=>txt(p).includes(f)||p.code.includes(f)).slice(0,6).map(p=>`<div class="hit" onclick="entrada('${p.code}')"><b>${esc(full(p))}</b> <small>Stock actual: ${p.stock}</small></div>`).join('')||'<small>Sin resultados</small>':'';
 el.innerHTML=(db.entries||[]).slice(-15).reverse().map(e=>`<div class="row"><span class="grow">${esc(e.name)}<small>${e.t}</small></span><b>+${e.qty}</b></div>`).join('')||'<p class="mu">Sin entradas.</p>'}
-function entrada(c){if(!isManager())return toast('Solo administración puede registrar entradas de stock');const p=db.products.find(x=>x.code===c);if(!p)return;const q=parseInt(prompt('¿Cuántas unidades entran? ('+full(p)+')',1));if(!(q>0))return;p.stock+=q;(db.entries=db.entries||[]).push({t:new Date().toLocaleString('es-GT'),name:full(p),qty:q});eq.value='';save();rE();toast('Stock actualizado')}
+function entrada(c){if(!can('stock'))return toast('No tienes permiso para registrar entradas de stock');const p=db.products.find(x=>x.code===c);if(!p)return;const q=parseInt(prompt('¿Cuántas unidades entran? ('+full(p)+')',1));if(!(q>0))return;p.stock+=q;(db.entries=db.entries||[]).push({t:new Date().toLocaleString('es-GT'),name:full(p),qty:q});eq.value='';save();rE();toast('Stock actualizado')}
 let rg=1;
-function rRep(){rr.innerHTML=[[1,'Hoy'],[7,'7 días'],[30,'30 días']].map(a=>`<button class="chip ${rg===a[0]?'on':''}" onclick="rg=${a[0]};rRep()">${a[1]}</button>`).join('');
+function rRep(){if(!can('reports'))return toast('No tienes permiso para consultar reportes');rr.innerHTML=[[1,'Hoy'],[7,'7 días'],[30,'30 días']].map(a=>`<button class="chip ${rg===a[0]?'on':''}" onclick="rg=${a[0]};rRep()">${a[1]}</button>`).join('');
 const t0=new Date();t0.setHours(0,0,0,0);t0.setDate(t0.getDate()-(rg-1));const lim=t0.toLocaleDateString('en-CA');
 const V=db.invoices.filter(r=>r.day>=lim),sum=V.reduce((s,r)=>s+r.total,0),units=V.reduce((s,r)=>s+(r.items||[]).reduce((n,i)=>n+(Number(i.qty)||0),0),0),by={},tp={};
 V.forEach(r=>{by[r.pay]=(by[r.pay]||0)+r.total;(r.items||[]).forEach(i=>{const a=tp[i.name]=tp[i.name]||{q:0,m:0};a.q+=i.qty;a.m+=i.price*i.qty})});
 const stockUnits=db.products.reduce((s,p)=>s+(Number(p.stock)||0),0),stockCost=db.products.reduce((s,p)=>s+(Number(p.cost)||0)*(Number(p.stock)||0),0),stockRetail=db.products.reduce((s,p)=>s+(Number(p.price)||0)*(Number(p.stock)||0),0);
 const none='<p class="mu">Sin ventas.</p>';
 rbody.innerHTML=`<div class="card"><b>Inventario actual</b><div class="row"><span class="grow">Unidades en existencia</span><b>${stockUnits}</b></div><div class="row"><span class="grow">Costo estimado del inventario</span><b>${money(stockCost)}</b></div><div class="row"><span class="grow">Valor al precio de venta</span><b>${money(stockRetail)}</b></div><div class="row"><span class="grow">Margen bruto potencial</span><b>${money(stockRetail-stockCost)}</b></div><small>Estimado con las existencias y costos/precios actuales; no incluye gastos ni registra el monto real pagado en cada compra.</small></div><div class="card"><b>Ventas · ${rg===1?'hoy':rg+' días'}</b><div class="tot" style="color:var(--ac)">${money(sum)}</div><small>${units} unidad(es) vendida(s) · ${V.length} venta(s) · Promedio ${money(V.length?sum/V.length:0)}</small></div><div class="card"><b>Por forma de pago</b>${Object.entries(by).map(([k,v])=>`<div class="row"><span class="grow">${k==='Crédito'?'A Crédito':k}</span><b>${money(v)}</b></div>`).join('')||none}</div><div class="card"><b>Más vendidos</b>${Object.entries(tp).sort((a,b)=>b[1].q-a[1].q).slice(0,8).map(([k,v])=>`<div class="row"><span class="grow">${esc(k)}</span><small style="margin:0">${v.q} u.</small><b>${money(v.m)}</b></div>`).join('')||none}</div>`}
-function rFin(){const I=db.invoices,tot=I.reduce((s,r)=>s+r.total,0),deu=I.reduce((s,r)=>s+(r.debt||0),0),ret=(db.fin||[]).filter(x=>x.type==='Retiro').reduce((s,x)=>s-x.amt,0);
+function rFin(){if(!can('finance'))return toast('No tienes permiso para consultar finanzas');const I=db.invoices,tot=I.reduce((s,r)=>s+r.total,0),deu=I.reduce((s,r)=>s+(r.debt||0),0),ret=(db.fin||[]).filter(x=>x.type==='Retiro').reduce((s,x)=>s-x.amt,0);
 fbody.innerHTML=`<div class="card"><div class="row"><span class="grow">Ventas totales</span><b>${money(tot)}</b></div><div class="row"><span class="grow">Por cobrar (deudas)</span><b>${money(deu)}</b></div><div class="row"><span class="grow">Retiros de caja</span><b>${money(ret)}</b></div><div class="row"><span class="grow">Efectivo en caja ahora</span><b>${isOpen()?money(db.caja.bal):'Caja cerrada'}</b></div></div><div class="card"><b>Movimientos de caja</b>${(db.fin||[]).slice(-20).reverse().map(x=>`<div class="row"><span class="grow">${x.type}<small>${x.t}${x.note?' · '+esc(x.note):''}</small></span><b>${money(x.amt)}</b></div>`).join('')||'<p class="mu">Sin movimientos.</p>'}</div>`}
 const DC=['Ropa','Calzado','Accesorios','Bolsos','Joyería','Belleza','Otros'];
 const cats=()=>db.cats&&db.cats.length?db.cats:DC;
 function rCatSel(){const v=pc.value;pc.innerHTML=cats().map(c=>`<option>${esc(c)}</option>`).join('');if(v)pc.value=v}
-function rCat(){catl.innerHTML=cats().map((c,i)=>`<div class="row"><span class="grow">${esc(c)}</span><small style="margin:0">${db.products.filter(p=>(p.cat||'Otros')===c).length} producto(s)</small><button class="d" onclick="delCat(${i})">Borrar</button></div>`).join('')}
-function addCat(){if(!isManager())return toast('Solo administración puede editar categorías');const v=cnew.value.trim();if(!v)return;db.cats=[...cats()];if(!db.cats.includes(v))db.cats.push(v);cnew.value='';save();rCat();rCatSel()}
-function delCat(i){if(!isManager())return toast('Solo administración puede editar categorías');db.cats=[...cats()];db.cats.splice(i,1);save();rCat();rCatSel()}
-function rCl(){const L=db.clients||[];ul.innerHTML=L.map((c,i)=>{const t=db.invoices.filter(r=>r.name===c.name).reduce((s,r)=>s+r.total,0);return `<div class="card row" style="border:0"><div class="grow"><b>${esc(c.name)}</b><small>${esc(c.phone||'')} · Compras: ${money(t)}</small></div><button class="d" onclick="delCl(${i})">Borrar</button></div>`}).join('')||'<p class="mu">Sin clientes guardados.</p>';cl.innerHTML=L.map(c=>`<option value="${esc(c.name)}">`).join('')}
-function addCl(){if(!isManager())return toast('Solo administración puede editar clientes');const n=un.value.trim();if(!n)return toast('Escribe el nombre');db.clients=db.clients||[];const i=db.clients.findIndex(c=>c.name===n);if(i<0)db.clients.push({name:n,phone:ut.value.trim()});else db.clients[i].phone=ut.value.trim();un.value='';ut.value='';save();rCl()}
-function delCl(i){if(!isManager())return toast('Solo administración puede editar clientes');db.clients.splice(i,1);save();rCl()}
+function rCat(){if(!authUser&&!isManager())return;if(!can('categories'))return toast('No tienes permiso para consultar categorías');cnew.parentElement.parentElement.style.display=can('categories')?'':'none';catl.innerHTML=cats().map((c,i)=>`<div class="row"><span class="grow">${esc(c)}</span><small style="margin:0">${db.products.filter(p=>(p.cat||'Otros')===c).length} producto(s)</small><button class="d" onclick="delCat(${i})">Borrar</button></div>`).join('')}
+function addCat(){if(!can('categories'))return toast('No tienes permiso para editar categorías');const v=cnew.value.trim();if(!v)return;db.cats=[...cats()];if(!db.cats.includes(v))db.cats.push(v);cnew.value='';save();rCat();rCatSel()}
+function delCat(i){if(!can('categories'))return toast('No tienes permiso para editar categorías');db.cats=[...cats()];db.cats.splice(i,1);save();rCat();rCatSel()}
+function rCl(){if(!authUser&&!isManager())return;if(!can('clients'))return toast('No tienes permiso para consultar clientes');const L=db.clients||[];ul.innerHTML=L.map((c,i)=>{const t=db.invoices.filter(r=>r.name===c.name).reduce((s,r)=>s+r.total,0);return `<div class="card row" style="border:0"><div class="grow"><b>${esc(c.name)}</b><small>${esc(c.phone||'')} · Compras: ${money(t)}</small></div><button class="d" onclick="delCl(${i})">Borrar</button></div>`}).join('')||'<p class="mu">Sin clientes guardados.</p>';cl.innerHTML=L.map(c=>`<option value="${esc(c.name)}">`).join('');$('s-u').querySelector('.card').style.display=can('clients')?'':'none'}
+function addCl(){if(!can('clients'))return toast('No tienes permiso para editar clientes');const n=un.value.trim();if(!n)return toast('Escribe el nombre');db.clients=db.clients||[];const i=db.clients.findIndex(c=>c.name===n);if(i<0)db.clients.push({name:n,phone:ut.value.trim()});else db.clients[i].phone=ut.value.trim();un.value='';ut.value='';save();rCl()}
+function delCl(i){if(!can('clients'))return toast('No tienes permiso para editar clientes');db.clients.splice(i,1);save();rCl()}
 function pickCl(v){cur.name=v;const c=(db.clients||[]).find(x=>x.name===v);if(c){ct.value=c.phone||'';cur.phone=ct.value}}
 const brs=()=>db.branches&&db.branches.length?db.branches:['Principal'];
 function rUsr(){const roleName=authRole==='staff'?'Personal':authRole==='manager'?'Administración':'Propietaria';usr.innerHTML='👤 '+esc(authUser&&authUser.displayName||'Administrador')+'<br><small>'+roleName+' · Sucursal: '+esc(db.branch||'Principal')+'</small><button class="g" style="width:100%;margin-top:8px" onclick="signOut()">Cerrar sesión</button>'}
 function rTeam(){if(!isManager())return;team.innerHTML=STAFF_ACCOUNTS.map(a=>{const d=teamDocs[a.uid],valid=d&&d.role==='staff'&&d.email===a.email,perms=d&&d.permissions||{};
-return `<div class="card"><b>${esc(a.name)}</b><small>${esc(a.email)}</small><small>UID: ${esc(a.uid)}</small>${valid?`<label class="row"><span class="grow">Puede usar Punto de Venta</span><input type="checkbox" ${perms.pos===true?'checked':''} onchange="setStaffPermission('${a.uid}','pos',this.checked)"></label><label class="row"><span class="grow">Puede gestionar pedidos</span><input type="checkbox" ${perms.orders===true?'checked':''} onchange="setStaffPermission('${a.uid}','orders',this.checked)"></label><label class="row"><span class="grow">Cuenta habilitada</span><input type="checkbox" ${d.enabled!==false?'checked':''} onchange="setStaffEnabled('${a.uid}',this.checked)"></label><small>Los cambios se aplican al instante en los dispositivos conectados.</small>`:`<p class="mu">La cuenta aún no está configurada.</p><button onclick="enableStaff('${a.uid}')">Dar acceso inicial</button>`}</div>`}).join('')}
+return `<div class="card"><b>${esc(a.name)}</b><small>${esc(a.email)}</small><small>UID: ${esc(a.uid)}</small>${valid?`${STAFF_MODULES.map(m=>`<label class="row"><span class="grow">Puede abrir ${esc(m.label)}</span><input type="checkbox" ${perms[m.key]===true?'checked':''} onchange="setStaffPermission('${a.uid}','${m.key}',this.checked)"></label>`).join('')}<label class="row"><span class="grow">Cuenta habilitada</span><input type="checkbox" ${d.enabled!==false?'checked':''} onchange="setStaffEnabled('${a.uid}',this.checked)"></label><small>Los cambios se aplican al instante en los dispositivos conectados. Equipo y permisos sigue reservado para administración.</small>`:`<p class="mu">La cuenta aún no está configurada.</p><button onclick="enableStaff('${a.uid}')">Dar acceso inicial</button>`}</div>`}).join('')}
 async function enableStaff(id){if(!isManager())return toast('Solo administración puede cambiar permisos');const a=STAFF_ACCOUNTS.find(x=>x.uid===id);if(!a)return;
-try{await fdb.collection('admins').doc(id).set({role:'staff',email:a.email,displayName:a.name,enabled:true,permissions:{pos:true,orders:true},updatedAt:firebase.firestore.FieldValue.serverTimestamp()});toast('Acceso habilitado para '+a.name)}
+const permissions=Object.fromEntries(STAFF_MODULES.map(m=>[m.key,m.key==='pos'||m.key==='orders']));
+try{await fdb.collection('admins').doc(id).set({role:'staff',email:a.email,displayName:a.name,enabled:true,permissions,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});toast('Acceso habilitado para '+a.name)}
 catch(e){console.error('No se pudo habilitar la cuenta del personal',e);toast('No se pudo habilitar la cuenta: '+(e.message||e.code))}}
-async function setStaffPermission(id,key,value){if(!isManager()||!['pos','orders'].includes(key))return toast('No tienes permiso para cambiar este acceso');const a=STAFF_ACCOUNTS.find(x=>x.uid===id),d=teamDocs[id];if(!a||!d||d.role!=='staff'||d.email!==a.email)return toast('No se encontró la cuenta autorizada');
+async function setStaffPermission(id,key,value){if(!isManager()||!STAFF_MODULES.some(m=>m.key===key))return toast('No tienes permiso para cambiar este acceso');const a=STAFF_ACCOUNTS.find(x=>x.uid===id),d=teamDocs[id];if(!a||!d||d.role!=='staff'||d.email!==a.email)return toast('No se encontró la cuenta autorizada');
 try{await fdb.collection('admins').doc(id).update({['permissions.'+key]:value,updatedAt:firebase.firestore.FieldValue.serverTimestamp()})}
 catch(e){console.error('No se pudo actualizar el permiso',e);toast('No se pudo guardar el permiso: '+(e.message||e.code));rTeam()}}
 async function setStaffEnabled(id,value){if(!isManager())return toast('Solo administración puede cambiar permisos');const a=STAFF_ACCOUNTS.find(x=>x.uid===id),d=teamDocs[id];if(!a||!d||d.role!=='staff'||d.email!==a.email)return toast('No se encontró la cuenta autorizada');
 try{await fdb.collection('admins').doc(id).update({enabled:value,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});toast(value?'Cuenta habilitada':'Cuenta deshabilitada')}
 catch(e){console.error('No se pudo cambiar el estado de la cuenta',e);toast('No se pudo cambiar el acceso: '+(e.message||e.code));rTeam()}}
-function rBr(){bl.innerHTML=brs().map((b,i)=>`<div class="card row" style="border:0"><div class="grow"><b>${esc(b)}</b><small>${b===(db.branch||'Principal')?'● Sucursal activa':''}</small></div><button class="g" onclick="setBr(${i})">Activar</button><button class="d" onclick="delBr(${i})">Borrar</button></div>`).join('');rUsr()}
-function addBr(){if(!isManager())return toast('Solo administración puede editar sucursales');const v=bn.value.trim();if(!v)return;db.branches=[...brs()];if(!db.branches.includes(v))db.branches.push(v);bn.value='';save();rBr()}
-function setBr(i){if(!isManager())return toast('Solo administración puede editar sucursales');db.branch=brs()[i];save();rBr()}
-function delBr(i){if(!isManager())return toast('Solo administración puede editar sucursales');if(brs().length<2)return toast('Debe quedar una sucursal');db.branches=[...brs()];const b=db.branches.splice(i,1)[0];if(db.branch===b)db.branch=db.branches[0];save();rBr()}
+function rBr(){if(!can('branches'))return toast('No tienes permiso para consultar sucursales');bl.innerHTML=brs().map((b,i)=>`<div class="card row" style="border:0"><div class="grow"><b>${esc(b)}</b><small>${b===(db.branch||'Principal')?'● Sucursal activa':''}</small></div><button class="g" onclick="setBr(${i})">Activar</button><button class="d" onclick="delBr(${i})">Borrar</button></div>`).join('');bn.parentElement.parentElement.style.display=can('branches')?'':'none';rUsr()}
+function addBr(){if(!can('branches'))return toast('No tienes permiso para editar sucursales');const v=bn.value.trim();if(!v)return;db.branches=[...brs()];if(!db.branches.includes(v))db.branches.push(v);bn.value='';save();rBr()}
+function setBr(i){if(!can('branches'))return toast('No tienes permiso para editar sucursales');db.branch=brs()[i];save();rBr()}
+function delBr(i){if(!can('branches'))return toast('No tienes permiso para editar sucursales');if(brs().length<2)return toast('Debe quedar una sucursal');db.branches=[...brs()];const b=db.branches.splice(i,1)[0];if(db.branch===b)db.branch=db.branches[0];save();rBr()}
 /* Punto de venta */
 let cur={name:'',phone:'',items:[],manual:false,total:0,flash:'',cat:'Todos'},pm='Efectivo';
 const today=()=>new Date().toLocaleDateString('en-CA');
 const isOpen=()=>db.caja&&db.caja.open;
-function rPOS(){const o=isOpen();nocaja.style.display=o?'none':'block';pos.style.display=o?'block':'none';if(!o)return;
+function rPOS(){if(!authUser&&!isManager())return;if(!can('pos'))return toast('No tienes permiso para usar el Punto de Venta');const o=isOpen();nocaja.style.display=o?'none':'block';pos.style.display=o?'block':'none';if(!o)return;
 const actions=document.querySelector('#pos .chips');actions.innerHTML=`<span class="chip" style="background:#2e7d5b;color:#fff">● Abierta</span>${isManager()?'<button class="chip" onclick="retirar()">Retirar Dinero</button><button class="chip" onclick="tab(&quot;i&quot;)">Cobrar Deuda</button><button class="chip" style="color:var(--dg)" onclick="cerrar()">Cerrar Caja</button>':''}`;
 chips.innerHTML=['Todos',...new Set(db.products.map(p=>p.cat||'Otros'))].map(c=>`<button class="chip ${cur.cat===c?'on':''}" onclick="cur.cat='${c}';rPOS()">${esc(c)}</button>`).join('');
 const f=norm(iq.value);
@@ -308,7 +312,7 @@ if(pm==='Crédito'&&!cur.name.trim())return toast('Escribe el nombre del cliente
 const v={id:crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'_'+Math.random().toString(36).slice(2),n:++db.n,date:new Date().toLocaleString('es-GT'),day:today(),name:nm,phone:cur.phone,pay:pm,items:cur.items,total:t,sub:cur.items.reduce((s,i)=>s+i.price*i.qty,0),recv,change,debt:pm==='Crédito'?t:0,branch:db.branch||'Principal',createdBy:authUser&&authUser.uid||''};
 v.items.forEach(i=>{const p=db.products.find(x=>x.code===i.code);if(p)p.stock-=i.qty});
 if(pm==='Efectivo')db.caja.bal+=t;
-db.invoices.push(v);if(isManager()&&nm!=='Consumidor Final'&&!(db.clients=db.clients||[]).some(x=>x.name===nm))db.clients.push({name:nm,phone:cur.phone||''});
+db.invoices.push(v);if(can('clients')&&nm!=='Consumidor Final'&&!(db.clients=db.clients||[]).some(x=>x.name===nm))db.clients.push({name:nm,phone:cur.phone||''});
 try{await save()}catch(e){db=before;saveLocal();rPOS();rI();toast('La venta no se guardó en Firebase. Revisa la conexión e inténtalo de nuevo.');return}
 cur={name:'',phone:'',items:[],manual:false,total:0,flash:'',cat:cur.cat};cn.value='';ct.value='';
 modc.innerHTML=`<div style="text-align:center"><div style="width:64px;height:64px;border-radius:50%;background:#2e7d5b;color:#fff;font-size:36px;line-height:64px;margin:0 auto 8px">✓</div><h2 style="color:#5fd39a;margin:0 0 6px">¡Venta Exitosa!</h2><p class="mu" style="margin:0">La venta se ha registrado en el sistema. ¿Qué deseas hacer ahora?</p><small style="margin-top:6px">Ticket #${v.n} · ${money(v.total)}${v.change?' · Cambio '+money(v.change):''}</small></div><div style="display:grid;gap:8px;margin-top:12px"><button class="g" onclick="wa(${v.n})">💬 Enviar por WhatsApp</button><button class="g" onclick="ticket(db.invoices.find(x=>x.n===${v.n}),false)">🖨 Imprimir Ticket</button><button onclick="closeMod()">🛒 Nueva Venta</button></div>`;rPOS()}
@@ -332,11 +336,11 @@ function wa(n){const r=db.invoices.find(x=>x.n===n);let ph=(r.phone||'').replace
 const t='*'+(db.store||'Seven Roses')+'* · Ticket #'+r.n+'\n'+r.date+'\n'+r.items.map(i=>i.qty+' x '+i.name+' — '+money(i.price*i.qty)).join('\n')+'\n*TOTAL: '+money(r.total)+'* ('+r.pay+')'+(r.debt?'\nSaldo pendiente: '+money(r.debt):'')+'\n¡Gracias por su preferencia!';
 window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(t),'_blank')}
 /* Inicio y caja */
-function rHome(){const c=db.caja,V=db.invoices.filter(r=>r.day===today());
-caja.innerHTML=c.open?`<b>Caja abierta</b><small>Efectivo en caja: ${money(c.bal)} · Apertura: ${money(c.start)}</small><div class="r2" style="margin-top:10px"><button class="g" onclick="retirar()">Retirar dinero</button><button class="d" onclick="cerrar()">Cerrar caja</button></div>`:`<div style="text-align:center"><div style="font-size:40px">🔒</div><b>Turno Cerrado</b><small style="margin:6px 0 12px">Abre la caja para empezar a vender.</small><button onclick="openCaja()">ABRIR CAJA AHORA</button></div>`;
+function rHome(){if(!authUser&&!isManager())return;if(!can('dashboard'))return toast('No tienes permiso para consultar el dashboard');const c=db.caja,V=db.invoices.filter(r=>r.day===today());
+caja.innerHTML=c.open?`<b>Caja abierta</b><small>Efectivo en caja: ${money(c.bal)} · Apertura: ${money(c.start)}</small>${isManager()?'<div class="r2" style="margin-top:10px"><button class="g" onclick="retirar()">Retirar dinero</button><button class="d" onclick="cerrar()">Cerrar caja</button></div>':can('pos')?'<div style="margin-top:10px"><button class="g" onclick="tab(&quot;f&quot;)">Ir a vender</button></div>':''}`:`<div style="text-align:center"><div style="font-size:40px">🔒</div><b>Turno Cerrado</b><small style="margin:6px 0 12px">Abre la caja para empezar a vender.</small>${can('pos')?'<button onclick="openCaja()">ABRIR CAJA AHORA</button>':''}</div>`;
 const by=m=>V.filter(r=>r.pay===m).reduce((s,r)=>s+r.total,0),sum=V.reduce((s,r)=>s+r.total,0),units=V.reduce((s,r)=>s+(r.items||[]).reduce((n,i)=>n+(Number(i.qty)||0),0),0);
 dash.innerHTML=`<b>Ventas de hoy</b><div class="tot" style="color:var(--ac)">${money(sum)}</div><small>${units} unidad(es) vendida(s) · ${V.length} venta(s)</small>${['Efectivo','Tarjeta','Transferencia','Crédito'].map(m=>`<div class="row" style="padding:4px 0"><span class="grow">${m==='Crédito'?'A Crédito':m}</span><b>${money(by(m))}</b></div>`).join('')}<small>Productos con poco stock (2 o menos): ${db.products.filter(p=>p.stock<=2).length}</small>`;
-debts.innerHTML=db.invoices.filter(r=>r.debt>0).map(r=>`<div class="row"><div class="grow"><b>${esc(r.name)}</b><small>#${r.n} · ${r.date}</small></div><b>${money(r.debt)}</b><button onclick="cobrarDeuda(${r.n})">Cobrar</button></div>`).join('')||'<p class="mu">Sin deudas pendientes.</p>'}
+debts.innerHTML=db.invoices.filter(r=>r.debt>0).map(r=>`<div class="row"><div class="grow"><b>${esc(r.name)}</b><small>#${r.n} · ${r.date}</small></div><b>${money(r.debt)}</b>${isManager()?`<button onclick="cobrarDeuda(${r.n})">Cobrar</button>`:''}</div>`).join('')||'<p class="mu">Sin deudas pendientes.</p>'}
 async function abrir(){if(!can('pos'))return toast('No tienes permiso para abrir caja');const m=parseFloat($('mi').value);if(isNaN(m)||m<0)return toast('Escribe el monto inicial');const before=JSON.parse(JSON.stringify(db));db.caja={open:true,start:m,bal:m,t0:Date.now(),moves:[]};try{await save()}catch(e){db=before;saveLocal();toast('No se pudo sincronizar la caja. Inténtalo de nuevo.');return}closeMod();rHome();toast('Caja abierta');tab('f')}
 function retirar(){if(!isManager())return toast('Solo administración puede registrar retiros');const v=parseFloat(prompt('Monto a retirar (Q)'));if(!(v>0))return;if(v>db.caja.bal)return toast('No hay tanto efectivo en caja');const n=prompt('Motivo (opcional)')||'';db.caja.bal-=v;db.caja.moves.push({t:new Date().toLocaleString('es-GT'),amt:-v,note:n});(db.fin=db.fin||[]).push({t:new Date().toLocaleString('es-GT'),type:'Retiro',amt:-v,note:n});save();rHome();toast('Retiro registrado')}
 function cerrar(){if(!isManager())return toast('Solo administración puede cerrar caja');const c=db.caja;if(!confirm('¿Cerrar caja? Efectivo esperado: '+money(c.bal)))return;(db.cierres=db.cierres||[]).push({date:new Date().toLocaleString('es-GT'),start:c.start,end:c.bal});(db.fin=db.fin||[]).push({t:new Date().toLocaleString('es-GT'),type:'Cierre de caja',amt:c.bal,note:'Apertura '+money(c.start)});db.caja={open:false};cur.items=[];save();rHome();rI();toast('Caja cerrada')}
@@ -370,15 +374,17 @@ const fauth=firebase.auth(),fdb=firebase.firestore(),googleProvider=new firebase
 googleProvider.setCustomParameters({prompt:'select_account'});
 const DATA_OWNER_UID='CebhzopoNTX70krUuVqv7aELAew2',SHARED_MANAGER_UID='bl2RfPTMp5h7opLSoPQh5MgdpM72',CLOUD_PREFIX='sevenroses_v1_';
 const STAFF_ACCOUNTS=[{uid:'xuVZvF01nxaRoeW6CNaGSJM0XOr2',email:'qsucely786@gmail.com',name:'Qsucely'},{uid:'OoTb1PYzrreBF57Ci4ZvfoMhtCg2',email:'cuyaneimi@gmail.com',name:'Cuyaneimi'}];
+const STAFF_MODULES=[{key:'dashboard',tab:'i',label:'Dashboard'},{key:'pos',tab:'f',label:'Punto de Venta'},{key:'orders',tab:'h',label:'Historial de ventas / pedidos propios'},{key:'stock',tab:'e',label:'Entradas de stock'},{key:'reports',tab:'r',label:'Reportes'},{key:'finance',tab:'n',label:'Finanzas'},{key:'products',tab:'p',label:'Productos'},{key:'categories',tab:'c',label:'Categorías'},{key:'clients',tab:'u',label:'Clientes'},{key:'branches',tab:'b',label:'Sucursales'}];
 let rdb=null,uid=null,sy={},sq=Promise.resolve(),authUser=null,authRole='',userPermissions={},authNotice='',authGeneration=0,adminUnsub=null,teamUnsub=null,teamDocs={},staffBaseline=null;
 const isManager=()=>authRole==='owner'||authRole==='manager';
 const can=permission=>isManager()||(authRole==='staff'&&userPermissions[permission]===true);
-function canOpenTab(t){if(!authUser)return true;if(isManager())return true;return(t==='f'&&can('pos'))||(t==='h'&&can('orders'))||(t==='a'&&isManager())}
-function renderAccess(){document.querySelectorAll('#menu button').forEach(b=>b.hidden=!canOpenTab(b.dataset.t));
+function permissionForTab(t){const module=STAFF_MODULES.find(m=>m.tab===t);return module&&module.key}
+function canOpenTab(t){if(!authUser||isManager())return true;if(t==='a')return false;const permission=permissionForTab(t);return!!permission&&can(permission)}
+function renderAccess(){document.querySelectorAll('#menu button').forEach(b=>{const allowed=canOpenTab(b.dataset.t);b.hidden=false;b.disabled=!allowed;b.setAttribute('aria-disabled',String(!allowed));b.title=allowed?'':'Angie o la propietaria pueden habilitar este permiso'});
 const ordersButton=document.querySelector('#menu button[data-t="h"]');ordersButton.textContent=authRole==='staff'?'🧾 Mis pedidos':'🧾 Historial Ventas';
-if(authRole==='staff'&&!can('pos')&&!can('orders')){authNotice='Tu cuenta está habilitada, pero no tiene módulos autorizados. Contacta a Angie o a la propietaria.';showAuth(authNotice);signOut();return}
 const current=document.querySelector('section.on'),currentTab=current&&current.id.slice(2);
-if(authRole==='staff'&&!canOpenTab(currentTab))tab(can('pos')?'f':can('orders')?'h':'f')}
+const first=STAFF_MODULES.find(m=>can(m.key));$('noStaffModules').hidden=!(authRole==='staff'&&!first);
+if(authRole==='staff'&&!canOpenTab(currentTab)){if(first)tab(first.tab);else{$('ttl').textContent='Sin módulos habilitados';document.querySelectorAll('section').forEach(s=>s.classList.remove('on'))}}}
 function stopAdminWatchers(){if(adminUnsub){adminUnsub();adminUnsub=null}if(teamUnsub){teamUnsub();teamUnsub=null}teamDocs={};staffBaseline=null}
 const setCs=m=>{$('cloud').textContent=m};
 function showAuth(message){$('authMessage').textContent=message;$('authGate').classList.add('on');$('authBtn').disabled=false}
@@ -393,7 +399,9 @@ const meta={};for(const k of ['store','n','caja','cats','clients','branches','br
 docs[CLOUD_PREFIX+'meta']={type:'meta',data:meta};
 db.products.forEach(p=>docs[CLOUD_PREFIX+'product_'+encodeURIComponent(p.code)]={type:'product',data:p});
 db.invoices.forEach(r=>docs[CLOUD_PREFIX+'invoice_'+encodeURIComponent(r.id||r.n)]={type:'invoice',data:r});
+const modules=staffModuleData();Object.keys(modules).forEach(key=>{docs[CLOUD_PREFIX+'module_'+key]={type:'module',module:key,data:modules[key]}});
 return docs}
+function staffModuleData(){return{dashboard:{store:db.store||'Seven Roses',branch:db.branch||'Principal',caja:db.caja||{open:false}},categories:{cats:db.cats||[]},clients:{clients:db.clients||[]},branches:{branches:db.branches||['Principal'],branch:db.branch||'Principal'},entries:{entries:db.entries||[]},finance:{fin:db.fin||[],cierres:db.cierres||[],caja:db.caja||{open:false}}}}
 async function doSync(){const now=cloudDocs(),writes=[],next={...sy};
 for(const id in now){const value=JSON.stringify(now[id]),data=JSON.parse(value);if(sy[id]!==value){writes.push({id,data});next[id]=value}}
 for(const id in sy)if(!(id in now)){writes.push({id,remove:true});delete next[id]}
@@ -407,31 +415,73 @@ existing.docs.forEach(d=>{if(!wanted.has(d.id))writes.push({id:d.id,remove:true}
 const meta=base.collection('posMeta').doc('current'),metaValue={type:'meta',data:{store:db.store||'Seven Roses',n:Number(db.n)||0,caja:db.caja||{open:false},branch:db.branch||'Principal',cats:db.cats||[]}},metaSnap=await meta.get();
 if(!metaSnap.exists||JSON.stringify(metaSnap.data())!==JSON.stringify(metaValue))writes.push({ref:meta,value:metaValue});
 for(let i=0;i<writes.length;i+=400){const batch=fdb.batch();writes.slice(i,i+400).forEach(w=>{const ref=w.ref||catalog.doc(w.id);if(w.remove)batch.delete(ref);else batch.set(ref,w.value)});await batch.commit()}}
-function staffSnapshot(products,invoices,meta){return{stocks:Object.fromEntries(products.map(p=>[p.code,p.stock])),invoiceIds:new Set(invoices.map(r=>r.id)),n:Number(meta.n)||0,caja:JSON.stringify(meta.caja||{open:false})}}
-async function doStaffSync(){if(!staffBaseline||!authUser)return;const base=fdb.collection('facturasUsers').doc(DATA_OWNER_UID),records=base.collection('records'),catalog=base.collection('posProducts'),meta=base.collection('posMeta').doc('current'),batch=fdb.batch();let writes=0;
-db.products.forEach(p=>{const old=staffBaseline.stocks[p.code];if(p.stock===old)return;if(!Number.isInteger(p.stock)||p.stock<0||p.stock>old)throw new Error('El personal solo puede descontar existencias mediante una venta');
-batch.update(records.doc(CLOUD_PREFIX+'product_'+encodeURIComponent(p.code)),{'data.stock':p.stock});
-batch.update(catalog.doc(encodeURIComponent(p.code)),{'data.stock':p.stock});writes+=2});
-db.invoices.forEach(r=>{if(staffBaseline.invoiceIds.has(r.id))return;if(r.createdBy!==authUser.uid||!r.id)throw new Error('No se puede sincronizar un pedido que no creó esta cuenta');
-batch.set(records.doc(CLOUD_PREFIX+'invoice_'+encodeURIComponent(r.id)),{type:'invoice',data:r});writes++});
-if(db.n!==staffBaseline.n||JSON.stringify(db.caja||{open:false})!==staffBaseline.caja){batch.update(records.doc(CLOUD_PREFIX+'meta'),{'data.n':db.n,'data.caja':db.caja});batch.update(meta,{'data.n':db.n,'data.caja':db.caja});writes+=2}
-if(!writes)return;
-await batch.commit();staffBaseline=staffSnapshot(db.products,db.invoices,{n:db.n,caja:db.caja});setCs('☁ Guardado en Firebase')}
+function staffSnapshot(products,invoices,meta,modules){const writableModules={};['categories','clients','branches','entries'].forEach(key=>{if(modules&&modules[key])writableModules[key]=modules[key]});return{products:Object.fromEntries(products.map(p=>[p.code,JSON.stringify(p)])),invoiceIds:new Set(invoices.map(r=>r.id)),n:Number(meta.n)||0,caja:JSON.stringify(meta.caja||{open:false}),modules:JSON.parse(JSON.stringify(writableModules))}}
+async function doStaffSync(){if(!staffBaseline||!authUser)return;const base=fdb.collection('facturasUsers').doc(DATA_OWNER_UID),records=base.collection('records'),catalog=base.collection('posProducts'),meta=base.collection('posMeta').doc('current'),writes=[];
+const addWrite=(method,ref,data)=>writes.push({method,ref,data}),oldProducts=staffBaseline.products||{},newProducts=Object.fromEntries(db.products.map(p=>[p.code,p]));
+if(can('products')){
+Object.keys(oldProducts).forEach(code=>{if(newProducts[code])return;const id=encodeURIComponent(code);addWrite('delete',records.doc(CLOUD_PREFIX+'product_'+id));addWrite('delete',catalog.doc(id))});
+db.products.forEach(p=>{const old=oldProducts[p.code],id=encodeURIComponent(p.code),publicProduct={...p};delete publicProduct.cost;
+if(old===JSON.stringify(p))return;
+const ref=records.doc(CLOUD_PREFIX+'product_'+id),catalogRef=catalog.doc(id);
+addWrite(old?'set':'set',ref,{type:'product',data:p});addWrite('set',catalogRef,{type:'product',data:publicProduct})})
+}else{
+db.products.forEach(p=>{const raw=oldProducts[p.code];if(!raw)return;const old=JSON.parse(raw);if(p.stock===old.stock)return;
+if(!Number.isInteger(p.stock)||p.stock<0||(!can('stock')&&(!can('pos')||p.stock>=old.stock)))throw new Error('No tienes permiso para hacer ese ajuste de existencias');
+addWrite('update',records.doc(CLOUD_PREFIX+'product_'+encodeURIComponent(p.code)),{'data.stock':p.stock});
+addWrite('update',catalog.doc(encodeURIComponent(p.code)),{'data.stock':p.stock})})
+}
+db.invoices.forEach(r=>{if(staffBaseline.invoiceIds.has(r.id))return;if(!can('pos')||r.createdBy!==authUser.uid||!r.id)throw new Error('No se puede sincronizar un pedido que no creó esta cuenta');
+addWrite('set',records.doc(CLOUD_PREFIX+'invoice_'+encodeURIComponent(r.id)),{type:'invoice',data:r})});
+if(db.n!==staffBaseline.n||JSON.stringify(db.caja||{open:false})!==staffBaseline.caja){if(!can('pos'))throw new Error('No tienes permiso para modificar la caja');
+addWrite('update',records.doc(CLOUD_PREFIX+'meta'),{'data.n':db.n,'data.caja':db.caja});addWrite('update',meta,{'data.n':db.n,'data.caja':db.caja})}
+const nowModules=staffModuleData();
+Object.keys(staffBaseline.modules||{}).forEach(key=>{if(JSON.stringify(nowModules[key])===JSON.stringify(staffBaseline.modules[key]))return;
+if(!can(key)||!['categories','clients','branches','entries'].includes(key))throw new Error('No tienes permiso para modificar '+key);
+addWrite('update',records.doc(CLOUD_PREFIX+'module_'+key),{data:nowModules[key]});
+if(key==='branches'&&can('pos'))addWrite('update',meta,{'data.branch':nowModules.branches.branch});
+if(key==='categories'&&can('pos'))addWrite('update',meta,{'data.cats':nowModules.categories.cats})});
+if(!writes.length)return;
+for(let i=0;i<writes.length;i+=400){const batch=fdb.batch();writes.slice(i,i+400).forEach(w=>{if(w.method==='delete')batch.delete(w.ref);else if(w.method==='update')batch.update(w.ref,w.data);else batch.set(w.ref,w.data)});await batch.commit()}
+staffBaseline=staffSnapshot(db.products,db.invoices,{n:db.n,caja:db.caja},nowModules);setCs('☁ Guardado en Firebase')}
 async function loadCloud(userId,role,user,permissions){setCs('☁ Conectando con Firebase…');
 const base=fdb.collection('facturasUsers').doc(userId),col=base.collection('records');
-if(role==='staff'){const products=[],invoices=[];let meta={};
+if(role==='staff'){const products=[],invoiceMap=new Map(),modules={},posMeta={};let fullProducts=false;
 if(permissions.pos){const [catalogSnap,metaSnap]=await Promise.all([base.collection('posProducts').get(),base.collection('posMeta').doc('current').get()]);
 if(!metaSnap.exists)throw new Error('El catálogo para Punto de Venta aún no está inicializado. Contacta a Angie o a la propietaria.');
-catalogSnap.docs.forEach(s=>{const x=s.data();if(x.type==='product'&&x.data)products.push(x.data)});meta=metaSnap.data().data||{}}
-if(permissions.orders){const snap=await col.where('type','==','invoice').where('data.createdBy','==',user.uid).get();snap.docs.forEach(s=>{const x=s.data();if(x.data)invoices.push(x.data)})}
-invoices.sort((a,b)=>a.n-b.n);db={products,invoices,n:Number(meta.n)||0,caja:meta.caja||{open:false},store:meta.store||'Seven Roses',branch:meta.branch||'Principal',cats:meta.cats||[],clients:[]};rdb=col;uid=userId;sy={};staffBaseline=staffSnapshot(products,invoices,meta);saveLocal()
+catalogSnap.docs.forEach(s=>{const x=s.data();if(x.type==='product'&&x.data)products.push(x.data)});Object.assign(posMeta,metaSnap.data().data||{})}
+fullProducts=permissions.products===true||permissions.reports===true;
+if(fullProducts){products.length=0;const snap=await col.where('type','==','product').get();snap.docs.forEach(s=>{const x=s.data();if(x.data)products.push(x.data)})}
+else if(!permissions.pos&&(permissions.stock||permissions.dashboard)){const snap=await base.collection('posProducts').get();snap.docs.forEach(s=>{const x=s.data();if(x.type==='product'&&x.data)products.push(x.data)})}
+if(permissions.orders||permissions.reports||permissions.finance||permissions.dashboard){let query=col.where('type','==','invoice');if(!permissions.reports&&!permissions.finance&&!permissions.dashboard)query=query.where('data.createdBy','==',user.uid);
+const snap=await query.get();snap.docs.forEach(s=>{const x=s.data();if(x.data)invoiceMap.set(x.data.id,x.data)})}
+const moduleKeys=[];if(permissions.dashboard)moduleKeys.push('dashboard');if(permissions.categories||permissions.products)moduleKeys.push('categories');if(permissions.clients)moduleKeys.push('clients');if(permissions.branches)moduleKeys.push('branches');if(permissions.stock)moduleKeys.push('entries');if(permissions.finance)moduleKeys.push('finance');
+await Promise.all(moduleKeys.map(async key=>{const snap=await col.doc(CLOUD_PREFIX+'module_'+key).get();if(snap.exists)modules[key]=snap.data().data||{}}));
+let invoices=[...invoiceMap.values()],moduleData={};
+if(modules.categories)moduleData.cats=modules.categories.cats||[];
+if(modules.clients)moduleData.clients=modules.clients.clients||[];
+if(modules.branches)moduleData.branches=modules.branches.branches||['Principal'];
+if(modules.entries)moduleData.entries=modules.entries.entries||[];
+if(modules.finance){moduleData.fin=modules.finance.fin||[];moduleData.cierres=modules.finance.cierres||[]}
+const financeCaja=modules.finance&&modules.finance.caja,dashboardCaja=modules.dashboard&&modules.dashboard.caja;
+invoices.sort((a,b)=>a.n-b.n);db={products,invoices,n:Number(posMeta.n)||0,caja:posMeta.caja||financeCaja||dashboardCaja||{open:false},store:posMeta.store||modules.dashboard&&modules.dashboard.store||'Seven Roses',branch:modules.branches&&modules.branches.branch||posMeta.branch||modules.dashboard&&modules.dashboard.branch||'Principal',cats:posMeta.cats||[],clients:[],...moduleData};
+rdb=col;uid=userId;sy={};staffBaseline=staffSnapshot(products,invoices,{n:db.n,caja:db.caja},modules);saveLocal()
 }else{const snap=await col.get(),docs=snap.docs.filter(s=>s.id.startsWith(CLOUD_PREFIX));rdb=col;uid=userId;sy={};docs.forEach(s=>sy[s.id]=JSON.stringify(s.data()));
 if(docs.length){const loaded={products:[],invoices:[],n:0,caja:{open:false}};
-docs.forEach(s=>{const x=s.data();if(x.type==='meta')Object.assign(loaded,x.data||{});else if(x.type==='product'&&x.data)loaded.products.push(x.data);else if(x.type==='invoice'&&x.data)loaded.invoices.push(x.data)});
+const modules={};docs.forEach(s=>{const x=s.data();if(x.type==='meta')Object.assign(loaded,x.data||{});else if(x.type==='module'&&x.module)modules[x.module]=x.data||{};else if(x.type==='product'&&x.data)loaded.products.push(x.data);else if(x.type==='invoice'&&x.data)loaded.invoices.push(x.data)});
+if(modules.categories)loaded.cats=modules.categories.cats||[];if(modules.clients)loaded.clients=modules.clients.clients||[];if(modules.branches){loaded.branches=modules.branches.branches||['Principal'];loaded.branch=modules.branches.branch||loaded.branch}if(modules.entries)loaded.entries=modules.entries.entries||[];if(modules.finance){loaded.fin=modules.finance.fin||[];loaded.cierres=modules.finance.cierres||[];loaded.caja=modules.finance.caja||loaded.caja}
 loaded.products=loaded.products||[];loaded.invoices=loaded.invoices||[];loaded.caja=loaded.caja||{open:false};loaded.invoices.sort((a,b)=>a.n-b.n);db=loaded;saveLocal()}
-else await doSync();
-await syncStaffViews()}
-rP();rI();rHome();rCatSel();rCl();rUsr();$('brand').textContent='🌹 '+(db.store||'Seven Roses')}
+await doSync()}
+if(can('products')||can('reports')||can('dashboard')||can('stock')||can('pos'))rP();
+if(can('pos')){rPOS();rI()}
+if(can('dashboard'))rHome();
+if(can('categories'))rCat();
+if(can('categories')||can('products'))rCatSel();
+if(can('clients'))rCl();
+if(can('branches'))rBr();
+if(can('orders'))rHist();
+if(can('reports'))rRep();
+if(can('finance'))rFin();
+rUsr();$('brand').textContent='🌹 '+(db.store||'Seven Roses')}
 async function signIn(){authNotice='';$('authBtn').disabled=true;$('authMessage').textContent='Abriendo el acceso de Google…';
 try{await fauth.signInWithPopup(googleProvider)}
 catch(e){if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment'){try{await fauth.signInWithRedirect(googleProvider);return}catch(redirectError){e=redirectError}}
@@ -443,13 +493,13 @@ stopAdminWatchers();
 if(!user){authUser=null;authRole='';userPermissions={};rdb=null;uid=null;sy={};setCs('☁ Inicia sesión para conectar Firebase');showAuth(authNotice||'Inicia sesión con la cuenta autorizada para conectar Firestore.');renderAccess();return}
 showAuth('Verificando cuenta administradora…');$('authBtn').disabled=true;
 try{const admin=await fdb.collection('admins').doc(user.uid).get();if(!admin.exists)throw new Error('La cuenta no tiene acceso a Seven Roses.');
-const data=admin.data(),role=data.role||'owner',knownStaff=STAFF_ACCOUNTS.some(a=>a.uid===user.uid&&a.email===user.email);
+const data=admin.data(),role=data.role||'owner',knownStaff=STAFF_ACCOUNTS.some(a=>a.uid===user.uid&&a.email===user.email);authRole=role;userPermissions=data.permissions||{};authUser=user;
 if(!(user.uid===DATA_OWNER_UID&&role==='owner')&&!(user.uid===SHARED_MANAGER_UID&&role==='manager')&&!(knownStaff&&role==='staff'&&data.enabled!==false))throw new Error('La cuenta no está autorizada para Seven Roses.');
 await loadCloud(DATA_OWNER_UID,role,user,data.permissions||{});if(generation!==authGeneration)return;authUser=user;authRole=role;userPermissions=data.permissions||{};authNotice='';$('authGate').classList.remove('on');renderAccess();rUsr();
 adminUnsub=fdb.collection('admins').doc(user.uid).onSnapshot(s=>{if(generation!==authGeneration)return;if(!s.exists||s.data().enabled===false){authNotice='Tu acceso fue desactivado por la administración.';toast(authNotice);signOut();return}
 const updated=s.data();if(role==='staff'&&(updated.role!=='staff'||!STAFF_ACCOUNTS.some(a=>a.uid===user.uid&&a.email===user.email))){signOut();return}
 const previous=userPermissions,next=updated.permissions||{};authRole=updated.role||role;userPermissions=next;renderAccess();rUsr();
-if(role==='staff'&&(previous.pos!==next.pos||previous.orders!==next.orders)){loadCloud(DATA_OWNER_UID,authRole,user,next).then(()=>{if(generation===authGeneration){const active=document.querySelector('section.on');if(active&&active.id==='s-f')rPOS();if(active&&active.id==='s-h')rHist();renderAccess();rUsr()}}).catch(e=>{console.error('No se pudieron aplicar los permisos actualizados',e);toast('No se pudieron recargar los módulos: '+(e.message||e.code))})}},e=>{console.error('No se pudieron recibir cambios de permisos',e);toast('No se pudieron actualizar tus permisos en tiempo real')});
+if(role==='staff'&&STAFF_MODULES.some(m=>previous[m.key]!==next[m.key])){loadCloud(DATA_OWNER_UID,authRole,user,next).then(()=>{if(generation===authGeneration){const active=document.querySelector('section.on');if(active){const tabId=active.id.slice(2);if(RN[tabId])RN[tabId]()}renderAccess();rUsr()}}).catch(e=>{console.error('No se pudieron aplicar los permisos actualizados',e);toast('No se pudieron recargar los módulos: '+(e.message||e.code))})}},e=>{console.error('No se pudieron recibir cambios de permisos',e);toast('No se pudieron actualizar tus permisos en tiempo real')});
 if(isManager())teamUnsub=fdb.collection('admins').onSnapshot(s=>{teamDocs={};s.docs.forEach(d=>teamDocs[d.id]=d.data());rTeam()},e=>{console.error('No se pudo cargar el equipo',e);toast('No se pudo cargar la lista de permisos')})}
 catch(e){if(generation!==authGeneration)return;console.error('No se pudo validar la cuenta o cargar Firestore',e);authNotice=e.message||'No se pudo conectar con Firestore.';await fauth.signOut()}})
 db.caja=db.caja||{open:false};rP();rI();rHome();rCatSel();rCl();rUsr();$('brand').textContent='🌹 '+(db.store||'Seven Roses');

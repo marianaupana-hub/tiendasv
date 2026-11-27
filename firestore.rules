@@ -36,13 +36,68 @@ service cloud.firestore {
     }
 
     function canPos() {
-      return isStaff() &&
-        adminDoc().data.get('permissions', {}).get('pos', false) == true;
+      return canStaff('pos');
     }
 
     function canOrders() {
+      return canStaff('orders');
+    }
+
+    function canStaff(permission) {
       return isStaff() &&
-        adminDoc().data.get('permissions', {}).get('orders', false) == true;
+        adminDoc().data.get('permissions', {}).get(permission, false) == true;
+    }
+
+    function canReadModule(module) {
+      return (module == 'dashboard' && canStaff('dashboard')) ||
+        (module == 'categories' &&
+          (canStaff('categories') || canStaff('products'))) ||
+        (module == 'clients' && canStaff('clients')) ||
+        (module == 'branches' && canStaff('branches')) ||
+        (module == 'entries' && canStaff('stock')) ||
+        (module == 'finance' && canStaff('finance'));
+    }
+
+    function canWriteModule(module) {
+      return (module == 'categories' && canStaff('categories')) ||
+        (module == 'clients' && canStaff('clients')) ||
+        (module == 'branches' && canStaff('branches')) ||
+        (module == 'entries' && canStaff('stock'));
+    }
+
+    function validStaffModuleData(module, data) {
+      return data is map &&
+        ((module == 'categories' &&
+          data.keys().hasOnly(['cats']) &&
+          data.cats is list) ||
+         (module == 'clients' &&
+          data.keys().hasOnly(['clients']) &&
+          data.clients is list) ||
+         (module == 'branches' &&
+          data.keys().hasOnly(['branches', 'branch']) &&
+          data.branches is list &&
+          data.branch is string) ||
+         (module == 'entries' &&
+          data.keys().hasOnly(['entries']) &&
+          data.entries is list));
+    }
+
+    function validStaffPermissions(permissions) {
+      return permissions is map &&
+        permissions.keys().hasOnly([
+          'dashboard', 'pos', 'orders', 'stock', 'reports', 'finance',
+          'products', 'categories', 'clients', 'branches'
+        ]) &&
+        permissions.get('dashboard', false) is bool &&
+        permissions.get('pos', false) is bool &&
+        permissions.get('orders', false) is bool &&
+        permissions.get('stock', false) is bool &&
+        permissions.get('reports', false) is bool &&
+        permissions.get('finance', false) is bool &&
+        permissions.get('products', false) is bool &&
+        permissions.get('categories', false) is bool &&
+        permissions.get('clients', false) is bool &&
+        permissions.get('branches', false) is bool;
     }
 
     function changedOnly(keys) {
@@ -78,10 +133,37 @@ service cloud.firestore {
         request.resource.data.role == 'staff' &&
         request.resource.data.email == staffEmail(uid) &&
         request.resource.data.enabled is bool &&
-        request.resource.data.permissions is map &&
-        request.resource.data.permissions.keys().hasOnly(['pos', 'orders']) &&
-        request.resource.data.permissions.get('pos', false) is bool &&
-        request.resource.data.permissions.get('orders', false) is bool;
+        validStaffPermissions(request.resource.data.permissions);
+    }
+
+    function validProduct(product) {
+      return product is map &&
+        product.keys().hasOnly([
+          'code', 'name', 'img', 'cat', 'brand', 'size', 'color',
+          'price', 'cost', 'stock'
+        ]) &&
+        product.get('code', '') is string &&
+        product.get('name', '') is string &&
+        product.get('price', -1) is number &&
+        product.get('price', -1) >= 0 &&
+        product.get('cost', -1) is number &&
+        product.get('cost', -1) >= 0 &&
+        product.get('stock', -1) is int &&
+        product.get('stock', -1) >= 0;
+    }
+
+    function validPublicProduct(product) {
+      return product is map &&
+        product.keys().hasOnly([
+          'code', 'name', 'img', 'cat', 'brand', 'size', 'color',
+          'price', 'stock'
+        ]) &&
+        product.get('code', '') is string &&
+        product.get('name', '') is string &&
+        product.get('price', -1) is number &&
+        product.get('price', -1) >= 0 &&
+        product.get('stock', -1) is int &&
+        product.get('stock', -1) >= 0;
     }
 
     match /admins/{uid} {
@@ -98,7 +180,7 @@ service cloud.firestore {
     }
 
     match /products/{productId} {
-      allow read: if isManager() || canPos();
+      allow read: if isManager() || canStaff('products');
       allow create, delete: if isManager();
       allow update: if isManager() ||
         (canPos() &&
@@ -191,19 +273,30 @@ service cloud.firestore {
 
     match /facturasUsers/{userId}/posProducts/{productId} {
       allow read: if managesData(userId) ||
-        (userId == 'CebhzopoNTX70krUuVqv7aELAew2' && canPos());
-      allow create, delete: if managesData(userId);
+        (userId == 'CebhzopoNTX70krUuVqv7aELAew2' &&
+          (canPos() || canStaff('stock') || canStaff('dashboard')));
+      allow create: if managesData(userId) ||
+        (userId == 'CebhzopoNTX70krUuVqv7aELAew2' &&
+          canStaff('products') &&
+          request.resource.data.type == 'product' &&
+          validPublicProduct(request.resource.data.data));
+      allow delete: if managesData(userId) ||
+        (userId == 'CebhzopoNTX70krUuVqv7aELAew2' &&
+          canStaff('products') &&
+          resource.data.type == 'product');
       allow update: if managesData(userId) ||
         (userId == 'CebhzopoNTX70krUuVqv7aELAew2' &&
-          canPos() &&
           request.resource.data.type == 'product' &&
           request.resource.data.data is map &&
           resource.data.data is map &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['data']) &&
-          request.resource.data.data.diff(resource.data.data).affectedKeys().hasOnly(['stock']) &&
-          request.resource.data.data.stock is int &&
-          request.resource.data.data.stock >= 0 &&
-          request.resource.data.data.stock < resource.data.data.stock);
+          ((canStaff('products') &&
+            validPublicProduct(request.resource.data.data)) ||
+           (request.resource.data.data.diff(resource.data.data).affectedKeys().hasOnly(['stock']) &&
+            request.resource.data.data.stock is int &&
+            request.resource.data.data.stock >= 0 &&
+            ((canStaff('stock')) ||
+             (canPos() && request.resource.data.data.stock < resource.data.data.stock)))));
     }
 
     match /facturasUsers/{userId}/posMeta/{metaId} {
@@ -213,23 +306,34 @@ service cloud.firestore {
       allow update: if managesData(userId) ||
         (userId == 'CebhzopoNTX70krUuVqv7aELAew2' &&
           metaId == 'current' &&
-          canPos() &&
           request.resource.data.type == 'meta' &&
           request.resource.data.data is map &&
           resource.data.data is map &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['data']) &&
-          request.resource.data.data.diff(resource.data.data).affectedKeys().hasOnly(['n', 'caja']) &&
-          request.resource.data.data.n is int &&
-          request.resource.data.data.n >= resource.data.data.n &&
-          request.resource.data.data.caja is map);
+          ((canPos() &&
+            request.resource.data.data.diff(resource.data.data).affectedKeys().hasOnly(['n', 'caja']) &&
+            request.resource.data.data.n is int &&
+            request.resource.data.data.n >= resource.data.data.n &&
+            request.resource.data.data.caja is map) ||
+           (canStaff('categories') &&
+            request.resource.data.data.diff(resource.data.data).affectedKeys().hasOnly(['cats']) &&
+            request.resource.data.data.cats is list) ||
+           (canStaff('branches') &&
+            request.resource.data.data.diff(resource.data.data).affectedKeys().hasOnly(['branch']) &&
+            request.resource.data.data.branch is string)));
     }
 
     match /facturasUsers/{userId}/records/{recordId} {
       allow read: if managesData(userId) ||
         (userId == 'CebhzopoNTX70krUuVqv7aELAew2' &&
-          canOrders() &&
-          resource.data.type == 'invoice' &&
-          resource.data.data.createdBy == request.auth.uid);
+          isStaff() &&
+          ((resource.data.type == 'module' &&
+            canReadModule(resource.data.module)) ||
+           (resource.data.type == 'product' &&
+            (canStaff('products') || canStaff('reports'))) ||
+           (resource.data.type == 'invoice' &&
+            ((canOrders() && resource.data.data.createdBy == request.auth.uid) ||
+             canStaff('reports') || canStaff('finance') || canStaff('dashboard')))));
 
       allow create: if signedIn() &&
         (request.auth.uid == userId ||
@@ -246,7 +350,12 @@ service cloud.firestore {
             request.resource.data.data.items is list &&
             request.resource.data.data.items.size() > 0 &&
             request.resource.data.data.total is number &&
-            request.resource.data.data.total > 0));
+            request.resource.data.data.total > 0) ||
+          (userId == 'CebhzopoNTX70krUuVqv7aELAew2' &&
+            canStaff('products') &&
+            recordId.matches('sevenroses_v1_product_.*') &&
+            request.resource.data.type == 'product' &&
+            validProduct(request.resource.data.data)));
 
       allow update: if signedIn() &&
         (request.auth.uid == userId ||
@@ -254,15 +363,16 @@ service cloud.firestore {
             request.auth.uid == 'bl2RfPTMp5h7opLSoPQh5MgdpM72' &&
             isManager()) ||
           (userId == 'CebhzopoNTX70krUuVqv7aELAew2' &&
-            canPos() &&
             request.resource.data.type == 'product' &&
             request.resource.data.data is map &&
             resource.data.data is map &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['data']) &&
-            request.resource.data.data.diff(resource.data.data).affectedKeys().hasOnly(['stock']) &&
-            request.resource.data.data.stock is int &&
-            request.resource.data.data.stock >= 0 &&
-            request.resource.data.data.stock < resource.data.data.stock) ||
+            ((canStaff('products') && validProduct(request.resource.data.data)) ||
+             (request.resource.data.data.diff(resource.data.data).affectedKeys().hasOnly(['stock']) &&
+              request.resource.data.data.stock is int &&
+              request.resource.data.data.stock >= 0 &&
+              ((canStaff('stock')) ||
+               (canPos() && request.resource.data.data.stock < resource.data.data.stock))))) ||
           (userId == 'CebhzopoNTX70krUuVqv7aELAew2' &&
             canPos() &&
             recordId == 'sevenroses_v1_meta' &&
@@ -272,10 +382,21 @@ service cloud.firestore {
             request.resource.data.data.diff(resource.data.data).affectedKeys().hasOnly(['n', 'caja']) &&
             request.resource.data.data.n is int &&
             request.resource.data.data.n >= resource.data.data.n &&
-            request.resource.data.data.caja is map));
+            request.resource.data.data.caja is map) ||
+          (userId == 'CebhzopoNTX70krUuVqv7aELAew2' &&
+            resource.data.type == 'module' &&
+            canWriteModule(resource.data.module) &&
+            request.resource.data.type == 'module' &&
+            request.resource.data.module == resource.data.module &&
+            validStaffModuleData(resource.data.module, request.resource.data.data) &&
+            request.resource.data.keys().hasOnly(['type', 'module', 'data']) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['data'])));
 
       allow delete: if signedIn() &&
-        managesData(userId);
+        (managesData(userId) ||
+          (userId == 'CebhzopoNTX70krUuVqv7aELAew2' &&
+            canStaff('products') &&
+            resource.data.type == 'product'));
     }
   }
 }

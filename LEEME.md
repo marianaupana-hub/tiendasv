@@ -31,14 +31,44 @@ al UID autorizado `bl2RfPTMp5h7opLSoPQh5MgdpM72` compartirlos con rol `manager`.
 Las reglas de Firestore se mantienen en `firestore.rules` y se publican junto con
 `firebase.json`.
 
-La propietaria y Angie pueden administrar al personal desde **Equipo y permisos**.
-Las cuentas `qsucely786@gmail.com` y `cuyaneimi@gmail.com` tienen permisos
-independientes para Punto de Venta y Pedidos; los cambios se sincronizan en tiempo
-real. El personal no puede editar productos ni hacer ajustes de inventario,
-modificar clientes, registrar retiros/cerrar caja ni cambiar configuración; solo
-registrar ventas si tiene habilitado el Punto de Venta y ver sus propios pedidos en
-el historial si tiene habilitado Pedidos. El catálogo del personal no incluye el
-costo de compra.
+La propietaria y Angie pueden administrar por separado los permisos de cada cuenta
+desde **Equipo y permisos**. Las secciones se mantienen visibles para el personal;
+las que no tengan permiso aparecen deshabilitadas. Se pueden autorizar Dashboard,
+Punto de Venta, pedidos propios, entradas de stock, Reportes, Finanzas, Productos,
+Categorías, Clientes y Sucursales. **Equipo y permisos**, exportaciones, retiros,
+cierre de caja y cobro de deudas siguen reservados para administración.
+
+Los permisos de Productos y Reportes incluyen acceso a los costos de compra; Finanzas
+incluye datos de ventas y caja; Dashboard muestra resumen de ventas y caja; Clientes
+incluye sus nombres y teléfonos. Habilítalos solo para cuentas de confianza. Punto
+de Venta y Entradas de stock usan un catálogo sin costo de compra. Las reglas de
+Firestore aplican los permisos también a los datos, no solo al menú.
+
+### Avisos de ventas por correo
+Las ventas nuevas se envían a Angie desde una función privada de Firebase. El aviso
+incluye número, fecha, sucursal, forma de pago, total y productos; no incluye nombre
+ni teléfono del cliente. No se envían avisos retroactivos de ventas anteriores.
+
+Para activar el envío, habilita el plan Blaze de Firebase y configura un proveedor
+SMTP (por ejemplo, Gmail con contraseña de aplicación o un proveedor de correo).
+No uses la contraseña normal de Gmail ni guardes secretos en Git. Desde la carpeta
+del proyecto, crea estos secretos; Firebase CLI solicitará cada valor:
+
+```sh
+firebase functions:secrets:set SMTP_HOST --project tienda-3d54d
+firebase functions:secrets:set SMTP_PORT --project tienda-3d54d
+firebase functions:secrets:set SMTP_USER --project tienda-3d54d
+firebase functions:secrets:set SMTP_PASSWORD --project tienda-3d54d
+firebase functions:secrets:set SALES_NOTIFICATION_TO --project tienda-3d54d
+```
+
+Para Gmail normalmente se usa `smtp.gmail.com`, puerto `465` o `587`, el correo
+emisor y una contraseña de aplicación. Para el último secreto, usa el correo de Angie
+que recibirá los avisos. Después publica las reglas y la función:
+
+```sh
+firebase deploy --only firestore:rules,functions --project tienda-3d54d
+```
 
 ## Datos
 Se guardan en el navegador y se sincronizan con Firebase al iniciar sesión. Respalda
