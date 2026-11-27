@@ -87,3 +87,8 @@ valida que la suma coincida con el total, registra en caja solo la parte en efec
 y deja como deuda únicamente la parte a crédito. Los métodos y sus importes aparecen
 en tickets, facturas, WhatsApp, historial y reportes. Está disponible para toda cuenta
 con permiso de Punto de Venta, incluido el personal de Interfer.
+
+En el carrito se puede aplicar un descuento por porcentaje o por monto en quetzales.
+El total, los pagos y el cambio se calculan sobre el precio rebajado; el descuento
+queda guardado y aparece en el historial, los tickets, las facturas, WhatsApp y el CSV
+de ventas.

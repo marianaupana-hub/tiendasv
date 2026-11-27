@@ -122,13 +122,16 @@ main{padding:14px}
 <div id="chips" class="chips"></div>
 <div id="grid" class="grid"></div>
 </div>
-<div class="card"><div class="r2" style="align-items:center"><b>Carrito Actual</b><button class="d" style="flex:0 0 auto;padding:4px 8px" onclick="cur.items=[];cur.manual=false;rI()">Limpiar</button></div>
+<div class="card"><div class="r2" style="align-items:center"><b>Carrito Actual</b><button class="d" style="flex:0 0 auto;padding:4px 8px" onclick="clearCart()">Limpiar</button></div>
 <input id="cn" list="cl" placeholder="Cliente (Consumidor Final)" oninput="pickCl(this.value)" style="margin-top:8px">
 <input id="ct" type="tel" placeholder="Teléfono (para WhatsApp)" oninput="cur.phone=this.value">
 <div id="items"></div>
 <div class="mu" id="subl"></div>
+<label class="mu" for="discType">Descuento opcional</label>
+<div class="r2"><select id="discType" onchange="setDiscountType(this.value)" style="margin:0"><option value="percent">Porcentaje (%)</option><option value="amount">Monto (Q)</option></select><input id="discValue" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" aria-label="Valor del descuento" oninput="setDiscountValue(this.value)" style="margin:0"></div>
+<small id="discPreview" style="margin:6px 0"></small>
 <label class="mu">TOTAL (editable)</label>
-<div class="r2"><input id="tot" type="number" inputmode="decimal" step="0.01" class="tot" onchange="cur.manual=true;cur.total=+this.value||0;rI()" style="margin:0"><button id="auto" class="g" style="flex:0 0 auto;display:none" onclick="cur.manual=false;rI()">Auto</button></div>
+<div class="r2"><input id="tot" type="number" inputmode="decimal" step="0.01" class="tot" onchange="cur.manual=true;cur.discountValue='';cur.total=+this.value||0;rI()" style="margin:0"><button id="auto" class="g" style="flex:0 0 auto;display:none" onclick="cur.manual=false;rI()">Auto</button></div>
 <button style="width:100%;margin-top:10px;font-size:18px" onclick="cobrar()">COBRAR</button></div>
 </div></div></section>
 
@@ -284,9 +287,18 @@ function addBr(){if(!can('branches'))return toast('No tienes permiso para editar
 function setBr(i){if(!can('branches'))return toast('No tienes permiso para editar sucursales');db.branch=brs()[i];save();rBr()}
 function delBr(i){if(!can('branches'))return toast('No tienes permiso para editar sucursales');if(brs().length<2)return toast('Debe quedar una sucursal');db.branches=[...brs()];const b=db.branches.splice(i,1)[0];if(db.branch===b)db.branch=db.branches[0];save();rBr()}
 /* Punto de venta */
-let cur={name:'',phone:'',items:[],manual:false,total:0,flash:'',cat:'Todos'},pm='Efectivo',mixedPayments={Efectivo:'',Transferencia:'',Tarjeta:'',Crédito:''};
+let cur={name:'',phone:'',items:[],manual:false,total:0,discountType:'percent',discountValue:'',flash:'',cat:'Todos'},pm='Efectivo',mixedPayments={Efectivo:'',Transferencia:'',Tarjeta:'',Crédito:''};
 const paymentBreakdown=r=>Array.isArray(r.payments)&&r.payments.length?r.payments:[{method:r.pay||'Efectivo',amount:Number(r.total)||0}];
 const paymentSummary=r=>paymentBreakdown(r).map(p=>`${p.method==='Crédito'?'A Crédito':p.method}: ${money(p.amount)}`).join(' + ');
+const roundMoney=value=>Math.round((Number(value)+Number.EPSILON)*100)/100;
+function discountAmountFor(subtotal,type,value){const amount=String(value||'').trim()===''?0:Number(value);if(!Number.isFinite(amount)||amount<0)return 0;return roundMoney(type==='percent'?subtotal*amount/100:amount)}
+function invoiceDiscount(r){const saved=Number(r.discountAmount),amount=roundMoney(Math.max(0,Number.isFinite(saved)?saved:Number(r.sub||0)-Number(r.total||0)));if(amount<=0)return null;const type=r.discountType==='percent'?'percent':'amount';const value=type==='percent'?Number(r.discountValue):amount;return{amount,type,value:Number.isFinite(value)?value:amount}}
+function discountLabel(r){const discount=invoiceDiscount(r);if(!discount)return'';return discount.type==='percent'?`Descuento ${discount.value}%: ${money(discount.amount)}`:`Descuento: ${money(discount.amount)}`}
+function cartSubtotal(){return roundMoney(cur.items.reduce((sum,item)=>sum+item.price*item.qty,0))}
+function updateCartTotals(subtotal){const discount=cur.manual?Math.max(0,roundMoney(subtotal-Number(cur.total))):discountAmountFor(subtotal,cur.discountType,cur.discountValue);if(!cur.manual)cur.total=Math.max(0,roundMoney(subtotal-discount));subl.textContent='Subtotal: '+money(subtotal);discValue.max=cur.discountType==='percent'?'100':String(subtotal);discPreview.textContent=discount>0?`Descuento aplicado: ${money(discount)}${!cur.manual&&cur.discountType==='percent'&&String(cur.discountValue).trim()!==''?` (${cur.discountValue}%)`:''}`:'Sin descuento';tot.value=(+cur.total).toFixed(2);auto.style.display=cur.manual?'block':'none'}
+function setDiscountType(type){if(!['percent','amount'].includes(type))return;cur.discountType=type;cur.discountValue='';cur.manual=false;discValue.value='';updateCartTotals(cartSubtotal())}
+function setDiscountValue(value){cur.discountValue=value;cur.manual=false;updateCartTotals(cartSubtotal())}
+function clearCart(){cur.items=[];cur.manual=false;cur.discountValue='';rI()}
 function mixedTotalCents(){return['Efectivo','Transferencia','Tarjeta','Crédito'].reduce((sum,method)=>sum+Math.round((Number(mixedPayments[method])||0)*100),0)}
 function updateMixedPaymentSummary(){const total=mixedTotalCents(),wanted=Math.round((Number(cur.total)||0)*100),summary=$('mixedPaymentSummary');if(!summary)return;
 summary.innerHTML=`<div class="row"><span class="grow">Asignado</span><b>${money(total/100)} / ${money(wanted/100)}</b></div>${total===wanted?'<small style="color:#5fd39a">El pago cuadra con el total.</small>':`<small style="color:var(--dg)">Falta ${money(Math.abs(wanted-total)/100)} ${total<wanted?'por asignar':'por corregir'}.</small>`}`}
@@ -304,9 +316,9 @@ const p=db.products.find(x=>x.code===c);if(!p)return toast('Código no registrad
 const it=cur.items.find(x=>x.code===c);if((it?it.qty:0)>=p.stock)return toast('Sin stock disponible');
 if(it)it.qty++;else cur.items.push({code:p.code,name:full(p),price:p.price,qty:1});
 cur.flash=c;iq.value='';if($('s-f').classList.contains('on'))rPOS();else tab('f');toast('✓ Agregado: '+full(p));cur.flash=''}
-function rI(){let sum=0;cur.items.forEach(i=>sum+=i.price*i.qty);if(!cur.manual)cur.total=sum;
+function rI(){let sum=0;cur.items.forEach(i=>sum+=i.price*i.qty);discType.value=cur.discountType;discValue.value=cur.discountValue;
 items.innerHTML=cur.items.map((it,i)=>`<div class="row ${cur.flash===it.code?'flash':''}"><div class="grow"><b>${esc(it.name)}</b><small>${money(it.price)} c/u</small></div><div class="qty"><button class="g" onclick="qty(${i},-1)">−</button><span>${it.qty}</span><button class="g" onclick="qty(${i},1)">+</button></div><span class="sub">${money(it.price*it.qty)}</span><button class="d" style="padding:4px 8px" onclick="qty(${i},-99)">🗑</button></div>`).join('')||'<p class="mu">Toca un producto o escanea un código.</p>';
-subl.textContent='Subtotal: '+money(sum);tot.value=(+cur.total).toFixed(2);auto.style.display=cur.manual?'block':'none'}
+updateCartTotals(roundMoney(sum))}
 function qty(i,d){const p=db.products.find(x=>x.code===cur.items[i].code);cur.items[i].qty+=d;if(p&&cur.items[i].qty>p.stock){cur.items[i].qty=p.stock;toast('Sin stock disponible')}if(cur.items[i].qty<=0)cur.items.splice(i,1);rI()}
 function cobrar(){if(!can('pos'))return toast('No tienes permiso para cobrar ventas');if(!cur.items.length)return toast('Agrega al menos un producto');pm='Efectivo';mixedPayments={Efectivo:'',Transferencia:'',Tarjeta:'',Crédito:''};payUI()}
 function payUI(){mod.classList.add('on');const M=[['Efectivo','💵','Efectivo'],['Transferencia','📲','QR / Transf.'],['Tarjeta','💳','Tarjeta'],['Crédito','🕒','A Crédito'],['Mixto','🔀','Pago mixto']];
@@ -319,7 +331,12 @@ if(pm==='Mixto'){updateMixedPaymentSummary();const cash=Number(mixedPayments.Efe
 function calcChg(){$('chg').innerHTML='<span>Cambio a devolver:</span><b>'+money(Math.max((+$('rec').value||cur.total)-cur.total,0))+'</b>'}
 function calcMixedChange(){const cash=Number(mixedPayments.Efectivo)||0,value=$('mixedReceived').value.trim(),received=value===''?cash:Number(value);$('mixedChange').innerHTML='<span>Cambio a devolver:</span><b>'+money(Math.max(received-cash,0))+'</b>'}
 function closeMod(){mod.classList.remove('on');mod.classList.remove('labels-modal')}
-async function confirmar(){if(!can('pos'))return toast('No tienes permiso para confirmar ventas');const before=JSON.parse(JSON.stringify(db)),t=Number(cur.total),nm=cur.name.trim()||'Consumidor Final';if(!Number.isFinite(t)||t<=0)return toast('El total de la venta no es válido');
+async function confirmar(){if(!can('pos'))return toast('No tienes permiso para confirmar ventas');const before=JSON.parse(JSON.stringify(db)),t=Number(cur.total),nm=cur.name.trim()||'Consumidor Final',sub=cartSubtotal(),enteredDiscount=String(cur.discountValue||'').trim()===''?0:Number(cur.discountValue);
+if(!Number.isFinite(enteredDiscount)||enteredDiscount<0)return toast('Escribe un descuento válido');
+if(!cur.manual&&cur.discountType==='percent'&&enteredDiscount>100)return toast('El descuento no puede superar el 100%');
+const appliedDiscount=cur.manual?roundMoney(Math.max(0,sub-t)):discountAmountFor(sub,cur.discountType,cur.discountValue);
+if(appliedDiscount>=sub&&appliedDiscount>0)return toast('El descuento no puede ser igual o mayor al subtotal');
+if(!Number.isFinite(t)||t<=0)return toast('El total de la venta no es válido');
 let payments=[],recv=0,change=0;
 if(pm==='Mixto'){const entered=['Efectivo','Transferencia','Tarjeta','Crédito'].map(method=>({method,value:String(mixedPayments[method]||'').trim()}));
 if(entered.some(payment=>payment.value!==''&&(!Number.isFinite(Number(payment.value))||Number(payment.value)<0)))return toast('Revisa los importes del pago mixto');
@@ -331,13 +348,14 @@ const cash=payments.find(payment=>payment.method==='Efectivo');if(cash){const va
 else{payments=[{method:pm,amount:t}];if(pm==='Efectivo'){const value=$('rec').value.trim();recv=value===''?t:Number(value);if(!Number.isFinite(recv)||recv<t)return toast('El efectivo recibido es menor al total');change=recv-t}
 if(pm==='Crédito'&&!cur.name.trim())return toast('Escribe el nombre del cliente')}
 const cashAmount=payments.filter(payment=>payment.method==='Efectivo').reduce((sum,payment)=>sum+payment.amount,0),debt=payments.filter(payment=>payment.method==='Crédito').reduce((sum,payment)=>sum+payment.amount,0);
-const v={id:crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'_'+Math.random().toString(36).slice(2),n:++db.n,date:new Date().toLocaleString('es-GT'),day:today(),name:nm,phone:cur.phone,pay:pm,payments,items:cur.items,total:t,sub:cur.items.reduce((s,i)=>s+i.price*i.qty,0),recv,change,debt,branch:db.branch||'Principal',createdBy:authUser&&authUser.uid||'',createdByName:authUser&&authUser.displayName||''};
+const recordedDiscountType=appliedDiscount>0?(cur.manual?'amount':cur.discountType):'',recordedDiscountValue=appliedDiscount>0?(cur.manual?appliedDiscount:enteredDiscount):0;
+const v={id:crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'_'+Math.random().toString(36).slice(2),n:++db.n,date:new Date().toLocaleString('es-GT'),day:today(),name:nm,phone:cur.phone,pay:pm,payments,items:cur.items,total:t,sub,discountType:recordedDiscountType,discountValue:recordedDiscountValue,discountAmount:appliedDiscount,recv,change,debt,branch:db.branch||'Principal',createdBy:authUser&&authUser.uid||'',createdByName:authUser&&authUser.displayName||''};
 v.items.forEach(i=>{const p=db.products.find(x=>x.code===i.code);if(p)p.stock-=i.qty});
 if(cashAmount>0)db.caja.bal+=cashAmount;
 db.invoices.push(v);if(can('clients')&&nm!=='Consumidor Final'&&!(db.clients=db.clients||[]).some(x=>x.name===nm))db.clients.push({name:nm,phone:cur.phone||''});
 try{await save()}catch(e){db=before;saveLocal();rPOS();rI();toast('La venta no se guardó en Firebase. Revisa la conexión e inténtalo de nuevo.');return}
-cur={name:'',phone:'',items:[],manual:false,total:0,flash:'',cat:cur.cat};cn.value='';ct.value='';
-modc.innerHTML=`<div style="text-align:center"><div style="width:64px;height:64px;border-radius:50%;background:#2e7d5b;color:#fff;font-size:36px;line-height:64px;margin:0 auto 8px">✓</div><h2 style="color:#5fd39a;margin:0 0 6px">¡Venta Exitosa!</h2><p class="mu" style="margin:0">La venta se ha registrado en el sistema. ¿Qué deseas hacer ahora?</p><small style="margin-top:6px">Ticket #${v.n} · ${money(v.total)}${v.change?' · Cambio '+money(v.change):''}</small></div><div style="display:grid;gap:8px;margin-top:12px"><button class="g" onclick="wa(${v.n})">💬 Enviar por WhatsApp</button><button class="g" onclick="ticket(db.invoices.find(x=>x.n===${v.n}),false)">🖨 Imprimir Ticket</button><button onclick="closeMod()">🛒 Nueva Venta</button></div>`;rPOS()}
+cur={name:'',phone:'',items:[],manual:false,total:0,discountType:'percent',discountValue:'',flash:'',cat:cur.cat};cn.value='';ct.value='';
+modc.innerHTML=`<div style="text-align:center"><div style="width:64px;height:64px;border-radius:50%;background:#2e7d5b;color:#fff;font-size:36px;line-height:64px;margin:0 auto 8px">✓</div><h2 style="color:#5fd39a;margin:0 0 6px">¡Venta Exitosa!</h2><p class="mu" style="margin:0">La venta se ha registrado en el sistema. ¿Qué deseas hacer ahora?</p><small style="margin-top:6px">Ticket #${v.n}${invoiceDiscount(v)?' · '+discountLabel(v):''} · ${money(v.total)}${v.change?' · Cambio '+money(v.change):''}</small></div><div style="display:grid;gap:8px;margin-top:12px"><button class="g" onclick="wa(${v.n})">💬 Enviar por WhatsApp</button><button class="g" onclick="ticket(db.invoices.find(x=>x.n===${v.n}),false)">🖨 Imprimir Ticket</button><button onclick="closeMod()">🛒 Nueva Venta</button></div>`;rPOS()}
 function ticket(r,share){const d=new jspdf.jsPDF({unit:'mm',format:[80,90+r.items.length*12+paymentBreakdown(r).length*5]});let y=10;
 const c=(t,s,b)=>{d.setFontSize(s);d.setFont(undefined,b?'bold':'normal');d.text(t,40,y,{align:'center'});y+=s*0.5+2};
 const ln=()=>{d.setLineDashPattern([1,1],0);d.line(5,y,75,y);d.setLineDashPattern([],0);y+=5};
@@ -348,6 +366,7 @@ L('CANT x DETALLE','SUBT.',1);
 r.items.forEach(i=>{const t=d.splitTextToSize(i.qty+' x '+i.name,50);d.setFont(undefined,'normal');d.setFontSize(9);d.text(t,5,y);d.text((i.price*i.qty).toFixed(2),75,y,{align:'right'});y+=t.length*4+1.5});
 y+=1;ln();
 if(Math.abs(r.sub-r.total)>0.001)L('Subtotal',money(r.sub));
+if(invoiceDiscount(r)){const discount=invoiceDiscount(r);L(discount.type==='percent'?`Descuento (${discount.value}%)`:'Descuento',money(discount.amount))}
 L('TOTAL VENTA:',money(r.total),1,11);
 L('Método: '+(r.pay==='Mixto'?'Mixto':r.pay==='Crédito'?'A CRÉDITO':r.pay.toUpperCase()));
 if(r.pay==='Mixto')paymentBreakdown(r).forEach(p=>L((p.method==='Crédito'?'A crédito':p.method)+':',money(p.amount)));
@@ -356,7 +375,7 @@ if(r.debt>0)L('Saldo pendiente: '+money(r.debt));
 y+=4;c('¡Gracias por su preferencia!',9);
 out(d.output('blob'),'Ticket-'+r.n+'.pdf','application/pdf',share)}
 function wa(n){const r=db.invoices.find(x=>x.n===n);let ph=(r.phone||'').replace(/\D/g,'');if(ph.length===8)ph='502'+ph;
-const t='*'+(db.store||'Seven Roses')+'* · Ticket #'+r.n+'\n'+r.date+'\n'+r.items.map(i=>i.qty+' x '+i.name+' — '+money(i.price*i.qty)).join('\n')+'\n*TOTAL: '+money(r.total)+'* ('+paymentSummary(r)+')'+(r.debt?'\nSaldo pendiente: '+money(r.debt):'')+'\n¡Gracias por su preferencia!';
+const t='*'+(db.store||'Seven Roses')+'* · Ticket #'+r.n+'\n'+r.date+'\n'+r.items.map(i=>i.qty+' x '+i.name+' — '+money(i.price*i.qty)).join('\n')+'\n'+(invoiceDiscount(r)?`Subtotal: ${money(r.sub)}\n${discountLabel(r)}\n`:'')+'*TOTAL: '+money(r.total)+'* ('+paymentSummary(r)+')'+(r.debt?'\nSaldo pendiente: '+money(r.debt):'')+'\n¡Gracias por su preferencia!';
 window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(t),'_blank')}
 /* Inicio y caja */
 function rHome(){if(!authUser&&!isManager())return;if(!can('dashboard'))return toast('No tienes permiso para consultar el dashboard');const c=db.caja,V=db.invoices.filter(r=>r.day===today());
@@ -377,6 +396,7 @@ const c=document.createElement('canvas');try{JsBarcode(c,i.code,{format:'EAN13',
 d.setFontSize(10);d.text(d.splitTextToSize(i.name,58),56,y+5);d.text(String(i.qty),120,y+5);d.text(money(i.price),140,y+5);d.text(money(i.price*i.qty),172,y+5);y+=18});
 y+=4;if(y>270){d.addPage();y=20}
 if(Math.abs(r.sub-r.total)>0.001){d.setFontSize(11);d.text('Subtotal: '+money(r.sub),196,y,{align:'right'});y+=7}
+d.setFontSize(11);if(invoiceDiscount(r)){d.setFont(undefined,'normal');d.text(discountLabel(r),196,y,{align:'right'});y+=7}
 d.setFontSize(15);d.setFont(undefined,'bold');d.text('Total a pagar: '+money(r.total),196,y,{align:'right'});
 out(d.output('blob'),'Factura-'+r.n+'.pdf','application/pdf',share)}
 function out(blob,name,type,share){const f=new File([blob],name,{type});
@@ -389,12 +409,12 @@ if(!sellers.includes(historySeller))historySeller='Todos';
 historyFilters.innerHTML=isManager()?sellers.map((name,index)=>`<button class="chip ${historySeller===name?'on':''}" data-seller-index="${index}">${esc(name==='Todos'?'Todas':name)}</button>`).join(''):'';
 historyFilters.querySelectorAll('button[data-seller-index]').forEach(button=>button.addEventListener('click',()=>{historySeller=sellers[Number(button.dataset.sellerIndex)]||'Todos';rHist()}));
 const invoices=all.filter(r=>historySeller==='Todos'||sellerLabel(r)===historySeller).slice().reverse();
-hist.innerHTML=invoices.map(r=>`<div class="card"><b>#${String(r.n).padStart(4,'0')} · ${esc(r.name)}</b><small>${r.date} · Registró: ${esc(sellerLabel(r))} · ${esc(r.pay==='Mixto'?paymentSummary(r):(r.pay||'Efectivo'))} · ${r.items.length} producto(s)</small><div class="tot" style="margin:6px 0">${money(r.total)}${r.debt>0?` <span class="tag">Debe ${money(r.debt)}</span>`:''}</div><div class="r2"><button class="g" style="padding:10px 4px" onclick="ticket(db.invoices.find(x=>x.id==='${esc(r.id||'')}'||x.n===${r.n}),false)">Ticket</button><button class="g" style="padding:10px 4px" onclick="pdf(db.invoices.find(x=>x.id==='${esc(r.id||'')}'||x.n===${r.n}),false)">Factura</button>${authRole==='staff'?'':`<button style="padding:10px 4px" onclick="wa(${r.n})">WhatsApp</button><button class="d" style="padding:10px 4px" onclick="delF(${r.n})">Borrar</button>`}</div></div>`).join('')||'<p class="mu">No hay ventas de esta persona en el historial.</p>';
+hist.innerHTML=invoices.map(r=>`<div class="card"><b>#${String(r.n).padStart(4,'0')} · ${esc(r.name)}</b><small>${r.date} · Registró: ${esc(sellerLabel(r))} · ${esc(r.pay==='Mixto'?paymentSummary(r):(r.pay||'Efectivo'))} · ${r.items.length} producto(s)</small>${invoiceDiscount(r)?`<small>${esc(discountLabel(r))}</small>`:''}<div class="tot" style="margin:6px 0">${money(r.total)}${r.debt>0?` <span class="tag">Debe ${money(r.debt)}</span>`:''}</div><div class="r2"><button class="g" style="padding:10px 4px" onclick="ticket(db.invoices.find(x=>x.id==='${esc(r.id||'')}'||x.n===${r.n}),false)">Ticket</button><button class="g" style="padding:10px 4px" onclick="pdf(db.invoices.find(x=>x.id==='${esc(r.id||'')}'||x.n===${r.n}),false)">Factura</button>${authRole==='staff'?'':`<button style="padding:10px 4px" onclick="wa(${r.n})">WhatsApp</button><button class="d" style="padding:10px 4px" onclick="delF(${r.n})">Borrar</button>`}</div></div>`).join('')||'<p class="mu">No hay ventas de esta persona en el historial.</p>';
 $('invoiceExports').style.display=authRole==='staff'?'none':''}
 function delF(n){if(!isManager())return toast('Solo administración puede borrar ventas');if(confirm('¿Borrar venta?')){db.invoices=db.invoices.filter(x=>x.n!==n);save();rHist()}}
 const cv=v=>'"'+String(v).replace(/"/g,'""')+'"';
 function csvP(){if(!isManager())return toast('Solo administración puede exportar el inventario');out(new Blob(['\ufeff'+['Codigo,Producto,Categoria,Marca,Talla,Color,Precio,Costo,Cantidad',...db.products.map(p=>[p.code,cv(p.name),cv(p.cat||''),cv(p.brand||''),cv(p.size||''),cv(p.color||''),p.price,p.cost||0,p.stock].join(','))].join('\n')],{type:'text/csv'}),'productos.csv','text/csv',true)}
-function csvF(){if(!isManager())return toast('Solo administración puede exportar facturas');out(new Blob(['\ufeff'+['Factura,Fecha,Cliente,Telefono,FormaPago,DesglosePago,Total,Detalle',...db.invoices.map(r=>[r.n,cv(r.date),cv(r.name),cv(r.phone||''),cv(r.pay||'Efectivo'),cv(paymentSummary(r)),r.total,cv(r.items.map(i=>i.qty+'x '+i.name).join('; '))].join(','))].join('\n')],{type:'text/csv'}),'facturas.csv','text/csv',true)}
+function csvF(){if(!isManager())return toast('Solo administración puede exportar facturas');const rows=db.invoices.map(r=>{const discount=invoiceDiscount(r);return[r.n,cv(r.date),cv(r.name),cv(r.phone||''),cv(r.pay||'Efectivo'),cv(paymentSummary(r)),r.sub||r.total,cv(discount?(discount.type==='percent'?discount.value+'%':'Monto'):''),discount?discount.amount:0,r.total,cv(r.items.map(i=>i.qty+'x '+i.name).join('; '))].join(',')});out(new Blob(['\ufeff'+['Factura,Fecha,Cliente,Telefono,FormaPago,DesglosePago,Subtotal,TipoDescuento,Descuento,Total,Detalle',...rows].join('\n')],{type:'text/csv'}),'facturas.csv','text/csv',true)}
 function setBrand(){if(!isManager())return toast('Solo administración puede cambiar la tienda');const v=prompt('Nombre de tu tienda',db.store||'Seven Roses');if(v&&v.trim()){db.store=v.trim();save();$('brand').textContent='🌹 '+db.store}}
 const firebaseConfig={apiKey:'AIzaSyArhik2SVlLuD7HoeZ_Oj2oeSPDuhDXs2w',authDomain:'tienda-3d54d.firebaseapp.com',projectId:'tienda-3d54d',storageBucket:'tienda-3d54d.firebasestorage.app',messagingSenderId:'785831038775',appId:'1:785831038775:web:0f8ce873266e72812fd4b2'};
 firebase.initializeApp(firebaseConfig);
