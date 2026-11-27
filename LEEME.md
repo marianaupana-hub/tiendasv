@@ -39,6 +39,10 @@ Categorías, Clientes y Sucursales. **Equipo y permisos**, exportaciones, retiro
 cierre de caja y cobro de deudas siguen reservados para administración.
 El historial muestra y permite filtrar las ventas por quien inició sesión al
 registrarlas; solo la propietaria y Angie pueden borrar ventas, no el personal.
+Al borrar una venta, el sistema devuelve sus unidades al inventario y, si el efectivo
+pertenece a la caja abierta, lo descuenta del saldo esperado. En Finanzas, solo la
+propietaria y Angie pueden borrar movimientos; los retiros y cobros de deuda de la
+caja abierta corrigen el saldo, y borrar un cobro de deuda restaura la deuda pendiente.
 
 Los permisos de Productos y Reportes incluyen acceso a los costos de compra; Finanzas
 incluye datos de ventas y caja; Dashboard muestra resumen de ventas y caja; Clientes
