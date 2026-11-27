@@ -53,7 +53,10 @@ body{padding:0}section>h2{display:none}.chip{border-radius:20px}
 #topbar{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--card);border-bottom:1px solid var(--bd)}
 #topbar button{background:none;color:var(--ac);font-size:22px;padding:0 6px}#topbar span{font:600 18px Georgia,serif}
 main{padding:14px}
-@media(min-width:900px){#side{transform:none}#topbar button{display:none}main,#topbar{margin-left:250px}.cols{display:grid;grid-template-columns:1fr 380px;gap:14px;align-items:start}.grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}}
+.cols{display:flex;flex-direction:column}
+.cols>.card{order:-1;position:sticky;top:0;z-index:20;max-height:55dvh;overflow-y:auto;overscroll-behavior:contain;box-shadow:0 6px 18px #0008}
+.cols>div{order:1}
+@media(min-width:900px){#side{transform:none}#topbar button{display:none}main,#topbar{margin-left:250px}.cols{display:grid;grid-template-columns:1fr 380px;gap:14px;align-items:start}.cols>.card{order:initial;position:sticky;top:14px;max-height:calc(100dvh - 28px);overflow-y:auto}.cols>div{order:initial}.grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}}
 
 .ph{width:56px;height:56px;border-radius:10px;object-fit:cover}
 .pt .im{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;margin-bottom:6px;background:var(--bd);display:flex;align-items:center;justify-content:center;font-size:34px}
